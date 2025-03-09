@@ -257,3 +257,279 @@
 .test-timer-danger {
   @apply text-red-500 animate-pulse;
 }
+
+/* Animation styles for JEE Simplified */
+.formula-element {
+  position: absolute;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  opacity: 0.1;
+  color: var(--primary);
+  font-size: 1.5rem;
+  animation: float-formula 15s infinite linear;
+  white-space: nowrap;
+}
+
+.formula-1 {
+  top: 10%;
+  left: -5%;
+  animation-duration: 25s;
+  animation-delay: 0s;
+}
+
+.formula-2 {
+  top: 30%;
+  right: 5%;
+  animation-duration: 20s;
+  animation-delay: 2s;
+}
+
+.formula-3 {
+  bottom: 15%;
+  left: 10%;
+  animation-duration: 22s;
+  animation-delay: 5s;
+}
+
+.formula-4 {
+  top: 60%;
+  right: 15%;
+  animation-duration: 18s;
+  animation-delay: 3s;
+}
+
+.formula-5 {
+  bottom: 40%;
+  left: 20%;
+  animation-duration: 24s;
+  animation-delay: 1s;
+}
+
+@keyframes float-formula {
+  0% {
+    transform: translateX(-20px) translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateX(20px) translateY(10px) rotate(5deg);
+  }
+  100% {
+    transform: translateX(-20px) translateY(0) rotate(0deg);
+  }
+}
+
+.atom-animation {
+  position: absolute;
+  top: 70%;
+  right: 10%;
+  width: 100px;
+  height: 100px;
+  opacity: 0.2;
+}
+
+.nucleus {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  background-color: var(--primary);
+  border-radius: 50%;
+}
+
+.electron {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background-color: var(--accent);
+  border-radius: 50%;
+  transform-origin: 50px 50px;
+}
+
+.electron-1 {
+  animation: orbit 3s linear infinite;
+}
+
+.electron-2 {
+  animation: orbit 4s linear infinite;
+  animation-delay: -1s;
+}
+
+.electron-3 {
+  animation: orbit 5s linear infinite;
+  animation-delay: -2s;
+}
+
+@keyframes orbit {
+  0% {
+    transform: rotate(0deg) translateX(40px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg) translateX(40px) rotate(-360deg);
+  }
+}
+
+.hero-image-container {
+  position: relative;
+  height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.floating-card {
+  position: absolute;
+  background-color: white;
+  border-radius: 12px;
+  padding: 10px 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.card-1 {
+  top: 20%;
+  left: 0;
+  animation: float-card 6s ease-in-out infinite;
+}
+
+.card-2 {
+  top: 50%;
+  right: 0;
+  animation: float-card 7s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+.card-3 {
+  bottom: 20%;
+  left: 20%;
+  animation: float-card 5s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+@keyframes float-card {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.hero-graphic {
+  width: 200px;
+  height: 200px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-circle {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse-scale 3s infinite ease-in-out;
+}
+
+.progress-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.progress-ring-bg {
+  fill: none;
+  stroke: rgba(var(--primary), 0.1);
+  stroke-width: 5;
+}
+
+.progress-ring-circle {
+  fill: none;
+  stroke: hsl(var(--primary));
+  stroke-width: 5;
+  stroke-dasharray: 283;
+  stroke-dashoffset: 50;
+  animation: progress-animation 3s ease-out forwards;
+}
+
+.progress-text {
+  position: absolute;
+  font-size: 2rem;
+  font-weight: bold;
+  color: hsl(var(--primary));
+}
+
+@keyframes progress-animation {
+  0% {
+    stroke-dashoffset: 283;
+  }
+  100% {
+    stroke-dashoffset: 50;
+  }
+}
+
+@keyframes pulse-scale {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.typewriter {
+  overflow: hidden;
+  border-right: 3px solid hsl(var(--primary));
+  white-space: nowrap;
+  margin: 0 auto;
+  letter-spacing: 0.1em;
+  animation: typing 3.5s steps(30, end), blink-caret 0.75s step-end infinite;
+}
+
+@keyframes typing {
+  from { width: 0 }
+  to { width: 100% }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent }
+  50% { border-color: hsl(var(--primary)) }
+}
+
+.animate-bounce-slow {
+  animation: bounce 3s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.pulse-animation {
+  animation: button-pulse 2s infinite;
+}
+
+@keyframes button-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--primary), 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(var(--primary), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--primary), 0);
+  }
+}

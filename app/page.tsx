@@ -1,27 +1,45 @@
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowRight, ChevronRight, Clock, Code, FileText, TrendingUp, Trophy, BookOpen } from "lucide-react"
+import { ArrowRight, ChevronRight, Clock, Code, FileText, TrendingUp, Trophy, BookOpen, Zap, Brain, Lightbulb } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export default function Home() {
   return (
     <div className="w-full">
       {/* Hero Section with Animation */}
-      <section className="w-full py-12 md:py-20 lg:py-28 bg-gradient-to-b from-background to-blue-50">
-        <div className="leetcode-container">
-          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
-            <div className="space-y-6">
+      <section className="w-full py-6 md:py-10 lg:py-16 bg-gradient-to-b from-background to-blue-50 overflow-hidden">
+        <div className="leetcode-container relative">
+          {/* Animated elements */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="formula-element formula-1">E = mc²</div>
+            <div className="formula-element formula-2">F = ma</div>
+            <div className="formula-element formula-3">PV = nRT</div>
+            <div className="formula-element formula-4">∫f(x)dx</div>
+            <div className="formula-element formula-5">d/dx(x²) = 2x</div>
+            <div className="atom-animation">
+              <div className="nucleus"></div>
+              <div className="electron electron-1"></div>
+              <div className="electron electron-2"></div>
+              <div className="electron electron-3"></div>
+            </div>
+          </div>
+
+          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center relative z-10">
+            <div className="space-y-4">
               <div className="inline-block rounded-lg bg-primary/10 px-3 py-1 text-sm text-primary animate-pulse">
                 Your JEE Success Journey Starts Here
               </div>
-              <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
+              <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl xl:text-5xl/none">
                 Welcome to <span className="gradient-heading animate-text-gradient">JEE Simplified</span>
               </h1>
-              <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                Crack JEE with confidence through structured practice, personalized analytics, and expert-curated content.
+              <p className="text-xl font-bold text-primary-600 my-3 animate-bounce-slow">
+                <span className="typewriter">Crack the Code, Ace the Exam!</span>
               </p>
-              <div className="flex flex-col gap-3 min-[400px]:flex-row">
-                <Button size="lg" className="takeuforward-button group transition-all duration-300 transform hover:scale-105" asChild>
+              <p className="max-w-[600px] text-muted-foreground md:text-lg">
+                Transform complex concepts into simple understanding. Our platform makes JEE preparation efficient, effective, and enjoyable.
+              </p>
+              <div className="flex flex-col gap-3 min-[400px]:flex-row pt-2">
+                <Button size="lg" className="takeuforward-button group transition-all duration-300 transform hover:scale-105 pulse-animation" asChild>
                   <Link href="/signup">
                     Get Started Free <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </Link>
@@ -29,6 +47,35 @@ export default function Home() {
               </div>
             </div>
             <div className="relative mx-auto w-full max-w-lg">
+              <div className="hero-image-container">
+                <div className="floating-card card-1">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-yellow-500" />
+                    <span className="font-medium">Quick Learning</span>
+                  </div>
+                </div>
+                <div className="floating-card card-2">
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-5 w-5 text-purple-500" />
+                    <span className="font-medium">Smart Practice</span>
+                  </div>
+                </div>
+                <div className="floating-card card-3">
+                  <div className="flex items-center gap-2">
+                    <Lightbulb className="h-5 w-5 text-amber-500" />
+                    <span className="font-medium">Concept Mastery</span>
+                  </div>
+                </div>
+                <div className="hero-graphic">
+                  <div className="progress-circle">
+                    <svg viewBox="0 0 100 100" className="progress-ring">
+                      <circle cx="50" cy="50" r="45" className="progress-ring-bg" />
+                      <circle cx="50" cy="50" r="45" className="progress-ring-circle" />
+                    </svg>
+                    <div className="progress-text">JEE</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -188,4 +235,3 @@ export default function Home() {
     </div>
   )
 }
-
