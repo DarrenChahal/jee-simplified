@@ -47,7 +47,7 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
     correctAnswer: "a",
     solution: `To evaluate the given integral, we'll use the substitution method.
 
-Let's substitute $t = \\sin x + \\cos x$. Then:
+Let&apos;s substitute $t = \\sin x + \\cos x$. Then:
 $dt = \\cos x dx - \\sin x dx$
 
 We need to express $\\sin x$ and $\\cos x$ in terms of $t$.

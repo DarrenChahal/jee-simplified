@@ -51,7 +51,7 @@ export default function TestimonialSection() {
             <Card key={index} className="overflow-hidden">
               <CardContent className="p-6 pt-8 relative">
                 <Quote className="h-8 w-8 text-primary/20 absolute top-4 left-4" />
-                <p className="relative z-10 text-muted-foreground">"{testimonial.quote}"</p>
+                <p className="relative z-10 text-muted-foreground">&quot;{testimonial.quote}&quot;</p>
               </CardContent>
               <CardFooter className="p-6 pt-0 flex items-center gap-4">
                 <Image
