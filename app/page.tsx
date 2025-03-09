@@ -1,101 +1,191 @@
-import Image from "next/image";
+import Link from "next/link"
+import Image from "next/image"
+import { ArrowRight, ChevronRight, Clock, Code, FileText, TrendingUp, Trophy, BookOpen } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 export default function Home() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="w-full">
+      {/* Hero Section with Animation */}
+      <section className="w-full py-12 md:py-20 lg:py-28 bg-gradient-to-b from-background to-blue-50">
+        <div className="leetcode-container">
+          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
+            <div className="space-y-6">
+              <div className="inline-block rounded-lg bg-primary/10 px-3 py-1 text-sm text-primary animate-pulse">
+                Your JEE Success Journey Starts Here
+              </div>
+              <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
+                Welcome to <span className="gradient-heading animate-text-gradient">JEE Simplified</span>
+              </h1>
+              <p className="max-w-[600px] text-muted-foreground md:text-xl">
+                Crack JEE with confidence through structured practice, personalized analytics, and expert-curated content.
+              </p>
+              <div className="flex flex-col gap-3 min-[400px]:flex-row">
+                <Button size="lg" className="takeuforward-button group transition-all duration-300 transform hover:scale-105" asChild>
+                  <Link href="/signup">
+                    Get Started Free <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+            <div className="relative mx-auto w-full max-w-lg">
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </section>
+
+      {/* Quick Access Features */}
+      <section className="takeuforward-section">
+        <div className="leetcode-container">
+          <h2 className="text-2xl font-bold mb-8 text-center">Prepare for JEE <span className="gradient-heading">Effectively</span></h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="takeuforward-card p-6 transition-all duration-300 hover:translate-y-[-5px]">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="p-3 bg-primary/10 rounded-full">
+                  <Code className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold">Practice Problems</h3>
+                <p className="text-muted-foreground">
+                  Access <span className="text-primary font-medium">3000+</span> JEE-level problems across Physics, Chemistry, and Mathematics.
+                </p>
+                <Button variant="outline" asChild className="mt-2 group">
+                  <Link href="/problems" className="flex items-center">
+                    Explore Problems <ChevronRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+            <div className="takeuforward-card p-6 transition-all duration-300 hover:translate-y-[-5px]">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="p-3 bg-primary/10 rounded-full">
+                  <Clock className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold">Mock Tests</h3>
+                <p className="text-muted-foreground">
+                  Take timed mock tests to simulate the <span className="text-primary font-medium">real exam</span> environment and improve your speed.
+                </p>
+                <Button variant="outline" asChild className="mt-2 group">
+                  <Link href="/mock-test" className="flex items-center">
+                    Take Mock Test <ChevronRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+            <div className="takeuforward-card p-6 transition-all duration-300 hover:translate-y-[-5px]">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="p-3 bg-primary/10 rounded-full">
+                  <FileText className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold">Previous Years</h3>
+                <p className="text-muted-foreground">
+                  Practice with <span className="text-primary font-medium">10+ years</span> of previous JEE papers to understand the exam pattern.
+                </p>
+                <Button variant="outline" asChild className="mt-2 group">
+                  <Link href="/previous-years" className="flex items-center">
+                    View Papers <ChevronRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Progress Tracker Teaser */}
+      <section className="takeuforward-section bg-gray-50">
+        <div className="leetcode-container">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6">
+              <h2 className="text-3xl font-bold">Track Your <span className="gradient-heading">Progress</span></h2>
+              <p className="text-muted-foreground">
+                Monitor your performance with detailed analytics, identify weak areas, and focus your preparation where it matters most.
+              </p>
+              <ul className="space-y-3">
+                <li className="flex items-start">
+                  <TrendingUp className="h-5 w-5 text-primary mr-2 mt-0.5" />
+                  <span>Visualize your improvement over time</span>
+                </li>
+                <li className="flex items-start">
+                  <Trophy className="h-5 w-5 text-primary mr-2 mt-0.5" />
+                  <span>Compare your performance with top performers</span>
+                </li>
+                <li className="flex items-start">
+                  <BookOpen className="h-5 w-5 text-primary mr-2 mt-0.5" />
+                  <span>Get personalized study recommendations</span>
+                </li>
+              </ul>
+              <Button className="takeuforward-button" asChild>
+                <Link href="/analytics">
+                  View Your Analytics
+                </Link>
+              </Button>
+            </div>
+            <div className="relative rounded-xl overflow-hidden shadow-lg">
+              <Image
+                src="/analytics.jpg"
+                alt="Analytics dashboard"
+                width={800}
+                height={600}
+                className="object-cover"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="takeuforward-section">
+        <div className="leetcode-container">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="text-3xl md:text-4xl font-bold gradient-heading">5K+</div>
+              <div className="text-sm md:text-base text-muted-foreground mt-2">JEE Students</div>
+            </div>
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="text-3xl md:text-4xl font-bold gradient-heading">3000+</div>
+              <div className="text-sm md:text-base text-muted-foreground mt-2">Practice Problems</div>
+            </div>
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="text-3xl md:text-4xl font-bold gradient-heading">100+</div>
+              <div className="text-sm md:text-base text-muted-foreground mt-2">Previous Year Papers</div>
+            </div>
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="text-3xl md:text-4xl font-bold gradient-heading">92%</div>
+              <div className="text-sm md:text-base text-muted-foreground mt-2">Success Rate</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="w-full py-12 md:py-16 lg:py-20 bg-gradient-to-r from-primary to-blue-600 text-white mt-12">
+        <div className="leetcode-container">
+          <div className="flex flex-col items-center justify-center space-y-6 text-center px-4">
+            <div className="space-y-4">
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">Ready to Crack JEE?</h2>
+              <p className="mx-auto max-w-[700px] md:text-xl">
+                Join thousands of students who are mastering JEE subjects with JEE<span className="font-bold">Simplified</span>.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 min-[400px]:flex-row">
+              <Button size="lg" variant="secondary" className="transition-all duration-300 transform hover:scale-105" asChild>
+                <Link href="/signup">
+                  Get Started for Free <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="bg-white/10 text-white hover:bg-white/20 border-white transition-all duration-300"
+                asChild
+              >
+                <Link href="/pricing">View Pricing</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
-  );
+  )
 }
+
