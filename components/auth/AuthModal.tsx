@@ -53,10 +53,15 @@ export function AuthModal({ isOpen, onClose, children }: AuthModalProps) {
           "relative z-10 w-full max-w-md transform transition-all duration-300 mx-auto",
           isVisible ? "translate-y-0" : "translate-y-8"
         )}
-        initial={{ scale: 0.9, opacity: 0 }}
+        initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ 
+          type: "spring", 
+          stiffness: 300, 
+          damping: 30,
+          duration: 0.2
+        }}
       >
         <div className="relative w-full rounded-xl overflow-hidden">
           {children}

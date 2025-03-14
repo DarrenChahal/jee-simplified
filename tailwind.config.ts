@@ -58,13 +58,20 @@ export default {
   		},
       animation: {
         move: "move 5s linear infinite",
-        "bounce-slow": "bounce 5s linear infinite",
+        "bounce-slow": "bounce 3s linear infinite",
         "text-gradient": "text-gradient 8s linear infinite",
+        "sparkle-move": "sparkle-move 4s linear infinite",
       },
       keyframes: {
         move: {
-          "0%": { transform: "translateX(-200px)" },
-          "100%": { transform: "translateX(200px)" },
+          "0%": { transform: "translateX(-10px)" },
+          "50%": { transform: "translateX(10px)" },
+          "100%": { transform: "translateX(-10px)" },
+        },
+        "sparkle-move": {
+          "0%": { opacity: "0", transform: "translateY(5px)" },
+          "50%": { opacity: "1", transform: "translateY(-5px)" },
+          "100%": { opacity: "0", transform: "translateY(5px)" },
         },
         "text-gradient": {
           "0%, 100%": {
@@ -81,7 +88,7 @@ export default {
   },
   plugins: [
     require("tailwindcss-animate"),
-    function({ addUtilities }) {
+    function({ addUtilities }: { addUtilities: any }) {
       const newUtilities = {
         '.scrollbar-hide': {
           /* Firefox */

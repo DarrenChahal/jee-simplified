@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -85,81 +85,153 @@ export function AuthCardSkeletonContainer({
 }
 
 export function AuthSkeleton() {
-  useEffect(() => {
-    // Using a simple approach to animate the circles
-    const animateCircles = () => {
-      const circles = document.querySelectorAll('.circle-1, .circle-2, .circle-3');
-      circles.forEach((circle, index) => {
-        setTimeout(() => {
-          circle.classList.add('animate-bounce');
-          setTimeout(() => {
-            circle.classList.remove('animate-bounce');
-          }, 800);
-        }, index * 800);
-      });
-    };
-    
-    animateCircles();
-    const interval = setInterval(animateCircles, 3000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <div className="p-4 overflow-hidden h-full relative flex flex-col items-center justify-center">
-      <div className="flex flex-row shrink-0 justify-center items-center gap-6 mb-4">
-        <Container className="h-12 w-12 circle-1 flex items-center justify-center">
-          <span className="text-xs text-blue-500 font-medium">Your</span>
-        </Container>
-        <Container className="h-16 w-16 circle-2 flex items-center justify-center">
-          <span className="text-xs text-primary font-medium">Prep</span>
-        </Container>
-        <Container className="h-12 w-12 circle-3 flex items-center justify-center">
-          <span className="text-xs text-purple-500 font-medium">Simplified</span>
-        </Container>
+      <div className="flex flex-row shrink-0 justify-center items-center gap-6 mb-4 relative">
+        {/* First circle */}
+        <motion.div
+          className="circle-1"
+          animate={{
+            scale: [1, 1, 1.1, 1],
+            y: [0, 0, -4, 0]
+          }}
+          transition={{
+            duration: 1,
+            times: [0, 0.3, 0.5, 0.8],
+            repeat: Infinity,
+            repeatDelay: 7,
+            ease: "easeInOut"
+          }}
+        >
+          <Container className="h-12 w-12 flex items-center justify-center">
+            <span className="text-xs text-blue-500 font-medium">Your</span>
+          </Container>
+        </motion.div>
+        
+        {/* Second circle */}
+        <motion.div
+          className="circle-2"
+          animate={{
+            scale: [1, 1, 1.1, 1],
+            y: [0, 0, -4, 0]
+          }}
+          transition={{
+            duration: 1,
+            times: [0, 0.3, 0.5, 0.8],
+            repeat: Infinity,
+            repeatDelay: 7,
+            delay: 2.7,
+            ease: "easeInOut"
+          }}
+        >
+          <Container className="h-16 w-16 flex items-center justify-center">
+            <span className="text-xs text-primary font-medium">Prep</span>
+          </Container>
+        </motion.div>
+        
+        {/* Third circle */}
+        <motion.div
+          className="circle-3"
+          animate={{
+            scale: [1, 1, 1.1, 1],
+            y: [0, 0, -4, 0]
+          }}
+          transition={{
+            duration: 1,
+            times: [0, 0.3, 0.5, 0.8],
+            repeat: Infinity,
+            repeatDelay: 7,
+            delay: 5.4,
+            ease: "easeInOut"
+          }}
+        >
+          <Container className="h-12 w-12 flex items-center justify-center">
+            <span className="text-xs text-purple-500 font-medium">Simplified</span>
+          </Container>
+        </motion.div>
       </div>
       
-      <div className="h-40 w-px absolute top-20 m-auto z-40 bg-gradient-to-b from-transparent via-cyan-500 to-transparent animate-move">
-        <div className="w-10 h-32 top-1/2 -translate-y-1/2 absolute -left-10">
+      {/* Animated vertical line that moves across the card */}
+      <motion.div 
+        className="h-full w-px absolute top-0 bottom-0 m-auto z-40 bg-gradient-to-b from-transparent via-cyan-500 to-transparent"
+        initial={{ left: "-10%" }}
+        animate={{ left: "110%" }}
+        transition={{
+          duration: 7.7,
+          repeat: Infinity,
+          repeatType: "loop",
+          ease: "linear",
+          repeatDelay: 0
+        }}
+      >
+        <div className="w-10 h-full top-0 absolute -left-5">
           <Sparkles />
         </div>
+      </motion.div>
+      
+      <div className="absolute inset-0 z-30">
+        <Sparkles />
       </div>
     </div>
   );
 }
 
 const Sparkles = () => {
-  const randomMove = () => Math.random() * 2 - 1;
-  const randomOpacity = () => Math.random();
-  const random = () => Math.random();
   return (
     <div className="absolute inset-0">
-      {[...Array(12)].map((_, i) => (
-        <motion.span
-          key={`star-${i}`}
-          animate={{
-            top: `calc(${random() * 100}% + ${randomMove()}px)`,
-            left: `calc(${random() * 100}% + ${randomMove()}px)`,
-            opacity: randomOpacity(),
-            scale: [1, 1.2, 0],
-          }}
-          transition={{
-            duration: random() * 2 + 4,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          style={{
-            position: "absolute",
-            top: `${random() * 100}%`,
-            left: `${random() * 100}%`,
-            width: `2px`,
-            height: `2px`,
-            borderRadius: "50%",
-            zIndex: 1,
-          }}
-          className="inline-block bg-black dark:bg-white"
-        ></motion.span>
-      ))}
+      {[...Array(15)].map((_, i) => {
+        return (
+          <motion.span
+            key={`star-${i}`}
+            initial={{
+              top: `${Math.random() * 100}%`,
+              left: `-10%`,
+              opacity: 0,
+              scale: 0
+            }}
+            animate={{
+              left: `110%`,
+              opacity: [0, 1, 1, 0],
+              scale: [0, 1, 1, 0],
+            }}
+            transition={{
+              duration: Math.random() * 5 + 5,
+              repeat: Infinity,
+              delay: Math.random() * 10,
+              ease: "linear"
+            }}
+            style={{
+              position: "absolute",
+              width: `${Math.random() * 2 + 1}px`,
+              height: `${Math.random() * 2 + 1}px`,
+              borderRadius: "50%",
+              zIndex: 1,
+            }}
+            className="inline-block bg-black dark:bg-white"
+          ></motion.span>
+        );
+      })}
+    </div>
+  );
+};
+
+const Container = ({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) => {
+  return (
+    <div
+      className={cn(
+        `rounded-full flex items-center justify-center bg-[rgba(248,248,248,0.01)]
+    shadow-[0px_0px_8px_0px_rgba(248,248,248,0.25)_inset,0px_32px_24px_-16px_rgba(0,0,0,0.40)]
+    `,
+        className
+      )}
+    >
+      {children}
     </div>
   );
 };
@@ -199,28 +271,6 @@ export const CardSkeletonContainer = ({
         className,
         showGradient &&
           "bg-neutral-300 dark:bg-[rgba(40,40,40,0.70)] [mask-image:radial-gradient(50%_50%_at_50%_50%,white_0%,transparent_100%)]"
-      )}
-    >
-      {children}
-    </div>
-  );
-};
-
-const Container = ({
-  className,
-  children,
-}: {
-  className?: string;
-  children: React.ReactNode;
-}) => {
-  return (
-    <div
-      className={cn(
-        `rounded-full flex items-center justify-center bg-[rgba(248,248,248,0.01)]
-    shadow-[0px_0px_8px_0px_rgba(248,248,248,0.25)_inset,0px_32px_24px_-16px_rgba(0,0,0,0.40)]
-    transition-all duration-300 hover:scale-110
-    `,
-        className
       )}
     >
       {children}
