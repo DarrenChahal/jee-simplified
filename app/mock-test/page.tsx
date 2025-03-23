@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { BookOpen, Clock, ChevronLeft, ChevronRight, CheckCircle, HelpCircle, FileText, Calendar, Filter, Search, Trophy, ArrowUpRight, Star, Timer } from "lucide-react"
+import { Clock, ChevronLeft, ChevronRight, CheckCircle, HelpCircle, Calendar, Search, Timer, Plus, Edit, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Card } from "@/components/ui/card"
@@ -12,15 +11,104 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { useRouter } from "next/navigation"
 
 export default function MockTestPage() {
+  const router = useRouter()
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({})
   const [timeRemaining, setTimeRemaining] = useState(5400) // 90 minutes in seconds
   const [isTestSubmitted, setIsTestSubmitted] = useState(false)
   const [activeTab, setActiveTab] = useState("upcoming-tests")
   const [isTestStarted, setIsTestStarted] = useState(false)
-  const [selectedTest, setSelectedTest] = useState<any>(null)
+  const [selectedTest, setSelectedTest] = useState<{
+    id?: number;
+    title: string;
+    description: string;
+    subject: string;
+    questions: number;
+    duration: number;
+    difficulty: string;
+    date: string;
+    time: string;
+    registrations?: number;
+  } | null>(null)
+
+  // State for dialog
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false)
+  
+  // Mock user role for demonstration - this would normally come from an auth system
+  const [userRole] = useState("admin") // For testing purposes, set to "admin"
+
+  // Test templates
+  const testTemplates = [
+    {
+      id: 1,
+      name: "JEE Main Template",
+      description: "Standard format for JEE Main exams with physics, chemistry and mathematics questions",
+      template: {
+        title: "JEE Main Mock Test",
+        description: "Comprehensive mock test following the latest JEE Main pattern",
+        subject: "Combined",
+        questions: 75,
+        duration: 180,
+        difficulty: "Medium",
+      }
+    },
+    {
+      id: 2,
+      name: "JEE Advanced Template",
+      description: "Standard format for JEE Advanced exams with more complex problems",
+      template: {
+        title: "JEE Advanced Mock Test",
+        description: "Challenging mock test following the JEE Advanced pattern",
+        subject: "Combined",
+        questions: 54,
+        duration: 180,
+        difficulty: "Hard",
+      }
+    },
+    {
+      id: 3,
+      name: "Physics Single Subject",
+      description: "Subject-focused test for physics topics",
+      template: {
+        title: "Physics Concept Test",
+        description: "Test covering key physics concepts for JEE preparation",
+        subject: "Physics",
+        questions: 25,
+        duration: 60,
+        difficulty: "Medium",
+      }
+    },
+    {
+      id: 4,
+      name: "Chemistry Single Subject",
+      description: "Subject-focused test for chemistry topics",
+      template: {
+        title: "Chemistry Concept Test",
+        description: "Test covering key chemistry concepts for JEE preparation",
+        subject: "Chemistry",
+        questions: 25,
+        duration: 60,
+        difficulty: "Medium",
+      }
+    },
+    {
+      id: 5,
+      name: "Mathematics Single Subject",
+      description: "Subject-focused test for mathematics topics",
+      template: {
+        title: "Mathematics Concept Test",
+        description: "Test covering key mathematics concepts for JEE preparation",
+        subject: "Mathematics",
+        questions: 25,
+        duration: 60,
+        difficulty: "Medium",
+      }
+    }
+  ]
 
   // Upcoming mock tests data
   const upcomingTests = [
@@ -252,7 +340,18 @@ export default function MockTestPage() {
     // Here you would typically send the answers to the server
   };
 
-  const handleStartTest = (test: any) => {
+  const handleStartTest = (test: {
+    id?: number;
+    title: string;
+    description: string;
+    subject: string;
+    questions: number;
+    duration: number;
+    difficulty: string;
+    date: string;
+    time: string;
+    registrations?: number;
+  }) => {
     setSelectedTest(test);
     setIsTestStarted(true);
     setTimeRemaining(test.duration * 60); // Convert minutes to seconds
@@ -263,6 +362,29 @@ export default function MockTestPage() {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
+  };
+
+  // For past tests, ensure we have the required properties
+  const handleStartPastTest = (test: {
+    id: number;
+    title: string;
+    description: string;
+    date: string;
+    time: string;
+    participants: number;
+    questions: number;
+    duration: number;
+    difficulty: string;
+  }) => {
+    // Add the missing subject property
+    const enrichedTest = {
+      ...test,
+      subject: test.description.includes("physics") ? "Physics" : 
+               test.description.includes("chemistry") ? "Chemistry" : 
+               test.description.includes("mathematics") ? "Mathematics" : "Combined",
+      registrations: test.participants
+    };
+    handleStartTest(enrichedTest);
   };
 
   // Calculate progress percentage
@@ -282,6 +404,24 @@ export default function MockTestPage() {
     if (minutesLeft < 15) return "test-timer test-timer-warning";
     return "test-timer";
   };
+
+  // Apply template to new test
+  const applyTemplate = (template: {
+    title: string;
+    description: string;
+    subject: string;
+    questions: number;
+    duration: number;
+    difficulty: string;
+  }) => {
+    router.push(`/mock-test/create?template=${encodeURIComponent(JSON.stringify(template))}`)
+  }
+
+  // Handle creating custom test without template
+  const handleCreateCustomTest = () => {
+    setShowTemplateDialog(false)
+    router.push("/mock-test/create")
+  }
 
   if (isTestStarted) {
     return (
@@ -425,12 +565,121 @@ export default function MockTestPage() {
         </div>
       </div>
 
+      {/* Template Selection Dialog */}
+      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+        <DialogContent className="sm:max-w-[725px]">
+          <DialogHeader>
+            <DialogTitle>Choose a Test Template</DialogTitle>
+            <DialogDescription>
+              Select a pre-defined template or create a new test from scratch
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {testTemplates.map((template) => (
+              <Card 
+                key={template.id} 
+                className="takeuforward-card p-4 cursor-pointer hover:border-primary/50 transition-all"
+                onClick={() => applyTemplate(template.template)}
+              >
+                <h3 className="font-medium text-md">{template.name}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge variant="outline" className="text-xs">
+                    {template.template.subject}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {template.template.questions} Questions
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {template.template.duration} min
+                  </Badge>
+                </div>
+              </Card>
+            ))}
+            
+            <Card 
+              className="takeuforward-card p-4 cursor-pointer border-dashed border-muted-foreground/30 hover:border-primary/50 transition-all"
+              onClick={handleCreateCustomTest}
+            >
+              <div className="flex flex-col items-center justify-center h-full py-4">
+                <Plus className="h-8 w-8 text-muted-foreground mb-2" />
+                <h3 className="font-medium">Create Custom Test</h3>
+                <p className="text-sm text-muted-foreground mt-1">Start with a blank template</p>
+              </div>
+            </Card>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Tabs defaultValue="upcoming-tests" className="space-y-6" onValueChange={setActiveTab}>
-        <TabsList className="grid w-full md:w-[600px] grid-cols-3">
+        <TabsList className={`grid w-full md:w-${userRole === "admin" ? "800px" : "600px"} grid-cols-${userRole === "admin" ? "4" : "3"}`}>
           <TabsTrigger value="upcoming-tests">Upcoming Mock Tests</TabsTrigger>
           <TabsTrigger value="past-tests">Past Mock Tests</TabsTrigger>
           <TabsTrigger value="my-tests">My Mock Tests</TabsTrigger>
+          {userRole === "admin" && (
+            <TabsTrigger value="admin-tests">Manage Tests</TabsTrigger>
+          )}
         </TabsList>
+        
+        {/* Admin Tab for Managing Tests - Only visible to admin users */}
+        {userRole === "admin" && (
+          <TabsContent value="admin-tests" className="space-y-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-medium">Manage Mock Tests</h2>
+              <Button 
+                onClick={() => setShowTemplateDialog(true)} 
+                className="takeuforward-button"
+              >
+                <Plus className="h-4 w-4 mr-2" /> Add New Test
+              </Button>
+            </div>
+            
+            <div className="overflow-hidden rounded-lg border">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium">Test Title</th>
+                    <th className="px-4 py-3 text-left font-medium">Subject</th>
+                    <th className="px-4 py-3 text-left font-medium">Date & Time</th>
+                    <th className="px-4 py-3 text-left font-medium">Registrations</th>
+                    <th className="px-4 py-3 text-left font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {upcomingTests.map((test) => (
+                    <tr key={test.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-4">
+                        <div className="font-medium">{test.title}</div>
+                        <div className="text-xs text-muted-foreground">{test.description}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <Badge className="bg-primary/80 text-primary-foreground">{test.subject}</Badge>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div>{test.date}</div>
+                        <div className="text-xs text-muted-foreground">{test.time}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div>{test.registrations}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" className="text-xs">
+                            <Edit className="h-3 w-3 mr-1" /> Edit
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-xs text-red-500 hover:text-red-600">
+                            <Trash2 className="h-3 w-3 mr-1" /> Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </TabsContent>
+        )}
         
         {/* Upcoming Mock Tests Tab */}
         <TabsContent value="upcoming-tests" className="space-y-6">
@@ -522,7 +771,7 @@ export default function MockTestPage() {
                             Problems
                           </Link>
                         </Button>
-                        <Button size="sm" className="takeuforward-button text-xs" onClick={() => handleStartTest(test)}>
+                        <Button size="sm" className="takeuforward-button text-xs" onClick={() => handleStartPastTest(test)}>
                           Take Virtually
                         </Button>
                       </div>
@@ -576,4 +825,3 @@ export default function MockTestPage() {
     </div>
   );
 }
-
