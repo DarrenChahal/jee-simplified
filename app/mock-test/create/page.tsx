@@ -2,28 +2,40 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import Link from "next/link"
-import { ChevronLeft, Edit, Trash2, Plus, Check, Save, Download } from "lucide-react"
+import { ChevronLeft, Edit, Trash2, Check, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { SaveTemplateDialog } from "@/components/mock-test/SaveTemplateDialog"
+import { useTestTemplate, TestDetails } from "../hooks/useTestTemplate"
 
 export default function CreateTestPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const templateParam = searchParams.get('template')
   
+  // Get template functionality from custom hook
+  const {
+    showSaveTemplateDialog,
+    setShowSaveTemplateDialog,
+    templateName,
+    setTemplateName,
+    templateDescription,
+    setTemplateDescription,
+    isFromTemplate,
+    loadTemplateFromParams,
+    saveTemplate,
+    isSaving
+  } = useTestTemplate()
+  
   // States for multi-step form
   const [activeStep, setActiveStep] = useState(1)
   
   // Test details state
-  const [testDetails, setTestDetails] = useState({
+  const [testDetails, setTestDetails] = useState<TestDetails>({
     title: "",
     description: "",
     subject: "Physics",
@@ -33,12 +45,6 @@ export default function CreateTestPage() {
     date: "",
     time: "",
   })
-
-  // Template save dialog
-  const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false)
-  const [templateName, setTemplateName] = useState("")
-  const [templateDescription, setTemplateDescription] = useState("")
-  const [isFromTemplate, setIsFromTemplate] = useState(false)
   
   // Questions state
   const [questions, setQuestions] = useState<{
@@ -63,25 +69,7 @@ export default function CreateTestPage() {
   
   // Load template from URL params if provided
   useEffect(() => {
-    if (templateParam) {
-      try {
-        const template = JSON.parse(decodeURIComponent(templateParam))
-        setTestDetails({
-          ...testDetails,
-          subject: template.subject || "Physics",
-          questions: template.questions || 25,
-          duration: template.duration || 90,
-          difficulty: template.difficulty || "Medium",
-          // Keep title and description blank for user to fill in if they are creating a new test
-          // from a pre-existing template
-          title: template.title || "",
-          description: template.description || "",
-        })
-        setIsFromTemplate(true)
-      } catch (e) {
-        console.error("Error parsing template:", e)
-      }
-    }
+    loadTemplateFromParams(templateParam, setTestDetails, testDetails)
   }, [templateParam])
   
   // Submit test details and move to questions step
@@ -94,32 +82,9 @@ export default function CreateTestPage() {
     setActiveStep(2)
   }
   
-  // Save test configuration as a template
+  // Handle save template button click
   const handleSaveTemplate = () => {
-    if (!templateName) {
-      alert("Please provide a template name")
-      return
-    }
-
-    const templateData = {
-      name: templateName,
-      description: templateDescription,
-      template: {
-        title: "",  // Leave blank for users to fill in
-        description: "", // Leave blank for users to fill in
-        subject: testDetails.subject,
-        questions: testDetails.questions,
-        duration: testDetails.duration,
-        difficulty: testDetails.difficulty,
-      }
-    }
-
-    // In a real app, you would save this to your database
-    // For now, we'll just show an alert
-    alert(`Template "${templateName}" saved successfully!`)
-    
-    // Close dialog
-    setShowSaveTemplateDialog(false)
+    saveTemplate(testDetails)
   }
   
   // Add or update question
@@ -208,58 +173,18 @@ export default function CreateTestPage() {
   
   return (
     <div className="container py-8">
-      {/* Save Template Dialog */}
-      <Dialog open={showSaveTemplateDialog} onOpenChange={setShowSaveTemplateDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Save as Template</DialogTitle>
-            <DialogDescription>
-              Save this test configuration as a template for future use
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="template-name">Template Name</Label>
-              <Input 
-                id="template-name" 
-                placeholder="e.g. JEE Advanced Physics Template" 
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="template-description">Template Description</Label>
-              <Input 
-                id="template-description" 
-                placeholder="Brief description of this template" 
-                value={templateDescription}
-                onChange={(e) => setTemplateDescription(e.target.value)}
-              />
-            </div>
-            
-            <div className="bg-muted/30 p-3 rounded text-sm">
-              <p className="font-medium mb-2">Template will include:</p>
-              <ul className="space-y-1 text-muted-foreground">
-                <li>• Subject: {testDetails.subject}</li>
-                <li>• Questions: {testDetails.questions}</li>
-                <li>• Duration: {testDetails.duration} minutes</li>
-                <li>• Difficulty: {testDetails.difficulty}</li>
-              </ul>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSaveTemplateDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveTemplate}>
-              Save Template
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Save Template Dialog - Using the extracted component */}
+      <SaveTemplateDialog 
+        open={showSaveTemplateDialog}
+        onOpenChange={setShowSaveTemplateDialog}
+        templateName={templateName}
+        setTemplateName={setTemplateName}
+        templateDescription={templateDescription}
+        setTemplateDescription={setTemplateDescription}
+        testDetails={testDetails}
+        onSave={handleSaveTemplate}
+        isSaving={isSaving}
+      />
 
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">

@@ -13,9 +13,12 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useRouter } from "next/navigation"
+import { useTemplates } from "./templates-provider"
+import { Template } from "./hooks/getTemplates"
 
 export default function MockTestPage() {
   const router = useRouter()
+  const { templates, isLoading: isLoadingTemplates, deleteTemplate } = useTemplates()
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({})
   const [timeRemaining, setTimeRemaining] = useState(5400) // 90 minutes in seconds
@@ -37,78 +40,10 @@ export default function MockTestPage() {
 
   // State for dialog
   const [showTemplateDialog, setShowTemplateDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
   
   // Mock user role for demonstration - this would normally come from an auth system
   const [userRole] = useState("admin") // For testing purposes, set to "admin"
-
-  // Test templates
-  const testTemplates = [
-    {
-      id: 1,
-      name: "JEE Main Template",
-      description: "Standard format for JEE Main exams with physics, chemistry and mathematics questions",
-      template: {
-        title: "JEE Main Mock Test",
-        description: "Comprehensive mock test following the latest JEE Main pattern",
-        subject: "Combined",
-        questions: 75,
-        duration: 180,
-        difficulty: "Medium",
-      }
-    },
-    {
-      id: 2,
-      name: "JEE Advanced Template",
-      description: "Standard format for JEE Advanced exams with more complex problems",
-      template: {
-        title: "JEE Advanced Mock Test",
-        description: "Challenging mock test following the JEE Advanced pattern",
-        subject: "Combined",
-        questions: 54,
-        duration: 180,
-        difficulty: "Hard",
-      }
-    },
-    {
-      id: 3,
-      name: "Physics Single Subject",
-      description: "Subject-focused test for physics topics",
-      template: {
-        title: "Physics Concept Test",
-        description: "Test covering key physics concepts for JEE preparation",
-        subject: "Physics",
-        questions: 25,
-        duration: 60,
-        difficulty: "Medium",
-      }
-    },
-    {
-      id: 4,
-      name: "Chemistry Single Subject",
-      description: "Subject-focused test for chemistry topics",
-      template: {
-        title: "Chemistry Concept Test",
-        description: "Test covering key chemistry concepts for JEE preparation",
-        subject: "Chemistry",
-        questions: 25,
-        duration: 60,
-        difficulty: "Medium",
-      }
-    },
-    {
-      id: 5,
-      name: "Mathematics Single Subject",
-      description: "Subject-focused test for mathematics topics",
-      template: {
-        title: "Mathematics Concept Test",
-        description: "Test covering key mathematics concepts for JEE preparation",
-        subject: "Mathematics",
-        questions: 25,
-        duration: 60,
-        difficulty: "Medium",
-      }
-    }
-  ]
 
   // Upcoming mock tests data
   const upcomingTests = [
@@ -130,7 +65,7 @@ export default function MockTestPage() {
       description: "Complete mock test covering organic, inorganic, and physical chemistry.",
       subject: "Chemistry",
       questions: 30,
-      duration: 60, // minutes
+      duration: 60, // minutes 
       difficulty: "Medium",
       date: "Mar 28, 2024",
       time: "2:00 PM",
@@ -406,21 +341,49 @@ export default function MockTestPage() {
   };
 
   // Apply template to new test
-  const applyTemplate = (template: {
-    title: string;
-    description: string;
-    subject: string;
-    questions: number;
-    duration: number;
-    difficulty: string;
-  }) => {
-    router.push(`/mock-test/create?template=${encodeURIComponent(JSON.stringify(template))}`)
+  const applyTemplate = (template: Template) => {
+    // Convert subject array to string for compatibility with current implementation
+    const subjectStr = Array.isArray(template.subject) ? template.subject.join(', ') : template.subject
+    
+    const formattedTemplate = {
+      title: "",
+      description: "",
+      subject: subjectStr,
+      questions: template.questions,
+      duration: template.duration,
+      difficulty: template.difficulty
+    }
+    
+    router.push(`/mock-test/create?template=${encodeURIComponent(JSON.stringify(formattedTemplate))}`)
   }
 
   // Handle creating custom test without template
   const handleCreateCustomTest = () => {
     setShowTemplateDialog(false)
     router.push("/mock-test/create")
+  }
+
+  // Handle deleting a template
+  const handleDeleteTemplate = async (e: React.MouseEvent, templateId: string) => {
+    e.stopPropagation() // Prevent the card click event from firing
+    
+    if (confirm("Are you sure you want to delete this template?")) {
+      setIsDeleting(templateId)
+      try {
+        const success = await deleteTemplate(templateId)
+        if (success) {
+          // Template was deleted successfully
+          // No need to refresh - templates state is updated inside deleteTemplate function
+        } else {
+          alert("Failed to delete template. Please try again.")
+        }
+      } catch (error) {
+        console.error("Error deleting template:", error)
+        alert("An error occurred while deleting the template.")
+      } finally {
+        setIsDeleting(null)
+      }
+    }
   }
 
   if (isTestStarted) {
@@ -576,27 +539,66 @@ export default function MockTestPage() {
           </DialogHeader>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            {testTemplates.map((template) => (
-              <Card 
-                key={template.id} 
-                className="takeuforward-card p-4 cursor-pointer hover:border-primary/50 transition-all"
-                onClick={() => applyTemplate(template.template)}
-              >
-                <h3 className="font-medium text-md">{template.name}</h3>
-                <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <Badge variant="outline" className="text-xs">
-                    {template.template.subject}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {template.template.questions} Questions
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {template.template.duration} min
-                  </Badge>
-                </div>
-              </Card>
-            ))}
+            {isLoadingTemplates ? (
+              <div className="col-span-2 py-8 flex justify-center items-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="col-span-2 py-8 text-center text-muted-foreground">
+                <p>No templates found. Create a new test from scratch.</p>
+              </div>
+            ) : (
+              <>
+                {templates.map((template) => (
+                  <Card 
+                    key={template._id} 
+                    className="takeuforward-card p-4 cursor-pointer hover:border-primary/50 transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      applyTemplate(template)
+                    }}
+                  >
+                    <h3 className="font-medium text-md">{template.name}</h3>
+                    <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <Badge variant="outline" className="text-xs">
+                        {Array.isArray(template.subject) ? template.subject.join(', ') : template.subject}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {template.questions} Questions
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {template.duration} min
+                      </Badge>
+                    </div>
+                    {userRole === "admin" && (
+                      <div className="mt-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="text-xs text-red-500 hover:text-red-600" 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteTemplate(e, template._id)
+                          }}
+                          disabled={isDeleting === template._id}
+                        >
+                          {isDeleting === template._id ? (
+                            <>
+                              <div className="h-3 w-3 mr-1 border-2 border-current border-t-transparent animate-spin rounded-full"></div> Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="h-3 w-3 mr-1" /> Delete
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </>
+            )}
             
             <Card 
               className="takeuforward-card p-4 cursor-pointer border-dashed border-muted-foreground/30 hover:border-primary/50 transition-all"
