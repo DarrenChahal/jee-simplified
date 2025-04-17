@@ -66,9 +66,10 @@ export default function CreateTestPage() {
     if (templateParam) {
       try {
         const template = JSON.parse(decodeURIComponent(templateParam))
+        console.log(template)
         setTestDetails({
           ...testDetails,
-          subject: template.subject || "Physics",
+          subject: template.subject || "Maths",
           questions: template.questions || 25,
           duration: template.duration || 90,
           difficulty: template.difficulty || "Medium",
