@@ -154,7 +154,7 @@ export default function CreateTestPage() {
   }
   
   // Add or update question
-  const handleAddQuestion = () => {
+  const handleAddQuestion = async () => {
     // Validate question
     if (!currentQuestion.text || currentQuestion.options.some(opt => !opt.text)) {
       toast({
@@ -165,26 +165,83 @@ export default function CreateTestPage() {
       return;
     }
     
+    const correctOption = currentQuestion.options.find(opt => opt.id === currentQuestion.correctAnswer);
+    if (!correctOption) {
+      toast({
+        title: "Error",
+        description: "Correct option not found",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Construct payload for backend
+    const payload = {
+      subjects: [testDetails.subject || "Physics"],
+      for_class: ["11", "12", "dropper"],
+      topics: ["Mechanics"],
+      difficulty: testDetails.difficulty || "Medium",
+      origin: {
+        type: "mock",
+        exam: "none",
+        test_id: testId
+      },
+      question_text: currentQuestion.text,
+      answer: {
+        type: "single_choice", // using single_choice for UI questions
+        options: currentQuestion.options.map(opt => opt.text),
+        correct_answer: correctOption.text
+      },
+      tags: ["JEE", "Mechanics", "Friction"],
+      status: "active",
+      created_by: "test@jeesimplified.com"
+    };
+    
+    // Send POST request to backend
+    try {
+      const response = await fetch("https://jee-simplified-api-226056335939.us-central1.run.app/api/questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (!result.success) {
+        toast({
+          title: "Error",
+          description: "Failed to add question to backend",
+          variant: "destructive"
+        });
+        return;
+      }
+    } catch (error) {
+      console.error("Error adding question:", error);
+      toast({
+        title: "Error",
+        description: "An error occurred while adding question",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Prepare local question data
     const questionData = {
       text: currentQuestion.text,
       options: [...currentQuestion.options],
       correctAnswer: currentQuestion.correctAnswer
-    }
+    };
     
     if (currentQuestion.isEditMode && currentQuestion.editIndex >= 0) {
       // Update existing question
-      const updatedQuestions = [...questions]
-      updatedQuestions[currentQuestion.editIndex] = questionData
-      setQuestions(updatedQuestions)
-      
+      const updatedQuestions = [...questions];
+      updatedQuestions[currentQuestion.editIndex] = questionData;
+      setQuestions(updatedQuestions);
       toast({
         title: "Question updated",
         description: "Question has been updated successfully"
       });
     } else {
       // Add new question
-      setQuestions([...questions, questionData])
-      
+      setQuestions([...questions, questionData]);
       toast({
         title: "Question added",
         description: "Question has been added successfully"
@@ -192,8 +249,8 @@ export default function CreateTestPage() {
     }
     
     // Reset form
-    resetQuestionForm()
-  }
+    resetQuestionForm();
+  };
   
   // Reset question form
   const resetQuestionForm = () => {
