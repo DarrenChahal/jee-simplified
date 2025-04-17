@@ -11,11 +11,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { SaveTemplateDialog } from "@/components/mock-test/SaveTemplateDialog"
 import { useTestTemplate, TestDetails } from "../hooks/useTestTemplate"
+import { toast } from "@/components/ui/use-toast"
 
 export default function CreateTestPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const templateParam = searchParams.get('template')
+  
+  // States for tracking API submission
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [testId, setTestId] = useState<string>("")
   
   // Get template functionality from custom hook
   const {
@@ -73,13 +78,74 @@ export default function CreateTestPage() {
   }, [templateParam])
   
   // Submit test details and move to questions step
-  const handleSubmitDetails = () => {
+  const handleSubmitDetails = async () => {
     if (!testDetails.title || !testDetails.description || !testDetails.date || !testDetails.time) {
-      alert("Please fill in all required fields")
+      toast({
+        title: "Missing information",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      })
       return
     }
     
-    setActiveStep(2)
+    setIsSubmitting(true)
+    
+    try {
+      // Convert date and time to timestamp
+      const dateTimeString = `${testDetails.date}T${testDetails.time}:00`;
+      const timestamp = new Date(dateTimeString).getTime();
+      
+      // Prepare the request body
+      const requestBody = {
+        title: testDetails.title,
+        description: testDetails.description,
+        test_pattern: "none", // For now, just "none"
+        created_by: "test@jeesimplified.com", // Will change after signin is implemented
+        subjects: [testDetails.subject], // Array of subjects
+        difficulty: testDetails.difficulty,
+        status: "draft",
+        test_duration: testDetails.duration,
+        test_date: timestamp,
+        max_score: 100, // Default score, can be made configurable later
+        are_questions_public: false // Default value
+      };
+      
+      // Send the request to the backend
+      const response = await fetch('https://jee-simplified-api-226056335939.us-central1.run.app/api/tests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Store the test ID for future use (like adding questions)
+        setTestId(data.data.documentId || data.data._id || '');
+        
+        // Show success message
+        toast({
+          title: "Test created",
+          description: "Test details saved successfully"
+        });
+        
+        // Move to the next step
+        setActiveStep(2);
+      } else {
+        throw new Error(data.message || 'Failed to create test');
+      }
+    } catch (error) {
+      console.error('Error creating test:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create test. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
   
   // Handle save template button click
@@ -91,8 +157,12 @@ export default function CreateTestPage() {
   const handleAddQuestion = () => {
     // Validate question
     if (!currentQuestion.text || currentQuestion.options.some(opt => !opt.text)) {
-      alert("Please fill in all fields")
-      return
+      toast({
+        title: "Missing information",
+        description: "Please fill in all fields",
+        variant: "destructive"
+      });
+      return;
     }
     
     const questionData = {
@@ -106,9 +176,19 @@ export default function CreateTestPage() {
       const updatedQuestions = [...questions]
       updatedQuestions[currentQuestion.editIndex] = questionData
       setQuestions(updatedQuestions)
+      
+      toast({
+        title: "Question updated",
+        description: "Question has been updated successfully"
+      });
     } else {
       // Add new question
       setQuestions([...questions, questionData])
+      
+      toast({
+        title: "Question added",
+        description: "Question has been added successfully"
+      });
     }
     
     // Reset form
@@ -145,30 +225,75 @@ export default function CreateTestPage() {
   const handleDeleteQuestion = (index: number) => {
     const updatedQuestions = questions.filter((_, i) => i !== index)
     setQuestions(updatedQuestions)
+    
+    toast({
+      title: "Question deleted",
+      description: "Question has been removed"
+    });
   }
   
   // Submit the entire test
-  const handleSubmitTest = () => {
+  const handleSubmitTest = async () => {
     if (questions.length === 0) {
-      alert("Please add at least one question")
-      return
+      toast({
+        title: "Missing questions",
+        description: "Please add at least one question",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!testId) {
+      toast({
+        title: "Error",
+        description: "Test ID is missing. Please try creating the test again.",
+        variant: "destructive"
+      });
+      return;
     }
     
-    // Here you would normally save the test to your database
-    // For now, we'll just show a success message
-    alert(`Test "${testDetails.title}" created successfully with ${questions.length} questions!`)
-    router.push('/mock-test')
+    setIsSubmitting(true);
+    
+    try {
+      // Here you would send the questions to the backend API
+      // using the testId to associate them with the test
+      
+      // For now, we'll just show a success message
+      toast({
+        title: "Success",
+        description: `Test "${testDetails.title}" created successfully with ${questions.length} questions!`
+      });
+      
+      // Navigate back to the tests list
+      router.push('/mock-test');
+    } catch (error) {
+      console.error('Error submitting questions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit questions. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
   
   // Preview the test
   const handlePreviewTest = () => {
     if (questions.length === 0) {
-      alert("Please add at least one question to preview")
-      return
+      toast({
+        title: "Missing questions", 
+        description: "Please add at least one question to preview",
+        variant: "destructive"
+      });
+      return;
     }
     
     // In a real app, you would save the draft and redirect to a preview page
-    alert("Preview functionality would be implemented here")
+    toast({
+      title: "Coming soon",
+      description: "Preview functionality will be implemented soon"
+    });
   }
   
   return (
@@ -349,10 +474,11 @@ export default function CreateTestPage() {
                 Cancel
               </Button>
               <Button 
-                className="takeuforward-button" 
+                className="takeuforward-button"
                 onClick={handleSubmitDetails}
+                disabled={isSubmitting}
               >
-                Continue to Add Questions
+                {isSubmitting ? "Saving..." : "Continue to Add Questions"}
               </Button>
             </div>
           </div>
@@ -593,8 +719,12 @@ export default function CreateTestPage() {
                 <Button variant="outline" onClick={handlePreviewTest}>
                   Preview Test
                 </Button>
-                <Button className="takeuforward-button" onClick={handleSubmitTest}>
-                  Publish Test
+                <Button 
+                  className="takeuforward-button" 
+                  onClick={handleSubmitTest}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Publishing..." : "Publish Test"}
                 </Button>
               </div>
             </div>

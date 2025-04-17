@@ -7,6 +7,7 @@ import Link from "next/link";
 import { BookOpen, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
+import { Toaster } from "@/components/ui/toaster";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -271,6 +272,7 @@ export default function RootLayout({
             </div>
           </footer>
         </div>
+        <Toaster />
       </body>
     </html>
   );
