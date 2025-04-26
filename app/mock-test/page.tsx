@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Clock, ChevronLeft, ChevronRight, CheckCircle, HelpCircle, Calendar, Search, Timer, Plus, Edit, Trash2 } from "lucide-react"
+import { Clock, ChevronLeft, ChevronRight, CheckCircle, HelpCircle, Calendar, Search, Timer, Plus, Edit, Trash2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useRouter } from "next/navigation"
 import { useTemplates } from "./templates-provider"
 import { Template } from "./hooks/getTemplates"
+import { toast } from "@/components/ui/use-toast"
 
 export default function MockTestPage() {
   const router = useRouter()
@@ -41,6 +42,22 @@ export default function MockTestPage() {
   // State for dialog
   const [showTemplateDialog, setShowTemplateDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false)
+  const [testToDelete, setTestToDelete] = useState<string | null>(null)
+  
+  // Add state for admin tests
+  const [adminTests, setAdminTests] = useState<{
+    id: string;
+    title: string;
+    description: string;
+    subject: string;
+    status: string;
+    date: string;
+    time: string;
+    registrations: number;
+    difficulty: string;
+  }[]>([])
+  const [isLoadingAdminTests, setIsLoadingAdminTests] = useState(false)
   
   // Mock user role for demonstration - this would normally come from an auth system
   const [userRole] = useState("admin") // For testing purposes, set to "admin"
@@ -386,6 +403,134 @@ export default function MockTestPage() {
     }
   }
 
+  // Fetch admin tests when admin tab is active
+  useEffect(() => {
+    if (activeTab === "admin-tests") {
+      fetchAdminTests()
+    }
+  }, [activeTab])
+
+  // Function to fetch tests from the API
+  const fetchAdminTests = async () => {
+    setIsLoadingAdminTests(true)
+    try {
+      const response = await fetch('https://jee-simplified-api-226056335939.us-central1.run.app/api/tests')
+      const data = await response.json()
+      
+      if (data.success) {
+        // Map API response to our required format
+        const formattedTests = data.data.documents.map((test: {
+          _id: string;
+          title: string;
+          description: string;
+          subjects?: string[];
+          status: string;
+          test_date: number;
+          registered_count?: number;
+          difficulty?: string;
+        }) => {
+          // Convert timestamp to readable date and time
+          const testDate = new Date(test.test_date)
+          const formattedDate = testDate.toLocaleDateString('en-US', {
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric'
+          })
+          const formattedTime = testDate.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          })
+          
+          return {
+            id: test._id,
+            title: test.title,
+            description: test.description,
+            subject: test.subjects?.[0] || "N/A",
+            status: test.status,
+            date: formattedDate,
+            time: formattedTime,
+            registrations: test.registered_count || 0,
+            difficulty: test.difficulty || "Medium"
+          }
+        })
+        
+        setAdminTests(formattedTests)
+      } else {
+        console.error('Failed to fetch tests:', data.message)
+      }
+    } catch (error) {
+      console.error('Error fetching tests:', error)
+    } finally {
+      setIsLoadingAdminTests(false)
+    }
+  }
+
+  // Function to get status badge variant
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'draft':
+        return "bg-amber-500 text-white font-medium"
+      case 'scheduled':
+        return "bg-blue-500 text-white font-medium"
+      case 'active':
+        return "bg-green-500 text-white font-medium"
+      case 'completed':
+        return "bg-gray-500 text-white font-medium"
+      default:
+        return "bg-blue-600 text-white font-medium"
+    }
+  }
+
+  // Function to handle test deletion
+  const handleDeleteTest = async (testId: string) => {
+    setTestToDelete(testId)
+    setShowDeleteConfirmDialog(true)
+  }
+  
+  // Function to confirm test deletion
+  const confirmDeleteTest = async () => {
+    if (!testToDelete) return
+    
+    setIsDeleting(testToDelete)
+    try {
+      const response = await fetch(`https://jee-simplified-api-226056335939.us-central1.run.app/api/tests/${testToDelete}`, {
+        method: 'DELETE'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Remove the deleted test from state
+        setAdminTests(adminTests.filter(test => test.id !== testToDelete))
+        
+        // Show success toast
+        toast({
+          title: "Test deleted",
+          description: "The test has been deleted successfully",
+        })
+      } else {
+        // Show error message
+        toast({
+          title: "Error",
+          description: data.message || "Failed to delete test",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting test:', error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      })
+    } finally {
+      setIsDeleting(null)
+      setTestToDelete(null)
+      setShowDeleteConfirmDialog(false)
+    }
+  }
+
   if (isTestStarted) {
     return (
       <div className="min-h-screen bg-background">
@@ -506,7 +651,7 @@ export default function MockTestPage() {
     <div className="leetcode-container py-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Practice <span className="gradient-heading">Tests</span></h1>
+          <h1 className="text-3xl font-bold tracking-tight">Practice <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-blue-600">Tests</span></h1>
           <p className="text-muted-foreground mt-1">Take mock tests and track your performance</p>
         </div>
         <div className="flex items-center gap-2">
@@ -614,6 +759,35 @@ export default function MockTestPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
+        <DialogContent className="sm:max-w-md border-0 shadow-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Delete Test</DialogTitle>
+            <DialogDescription className="text-base mt-2">
+              Are you sure you want to delete this test? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDeleteConfirmDialog(false)}
+              className="border-gray-300 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:hover:bg-gray-800"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteTest}
+              disabled={isDeleting !== null}
+              className="bg-red-500 hover:bg-red-600 text-white shadow-sm hover:shadow-md transition-all duration-200"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Tabs defaultValue="upcoming-tests" className="space-y-6" onValueChange={setActiveTab}>
         <TabsList className={`grid w-full md:w-${userRole === "admin" ? "800px" : "600px"} grid-cols-${userRole === "admin" ? "4" : "3"}`}>
           <TabsTrigger value="upcoming-tests">Upcoming Mock Tests</TabsTrigger>
@@ -628,57 +802,106 @@ export default function MockTestPage() {
         {userRole === "admin" && (
           <TabsContent value="admin-tests" className="space-y-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-medium">Manage Mock Tests</h2>
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-blue-600">Manage Mock Tests</h2>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={fetchAdminTests}
+                  disabled={isLoadingAdminTests}
+                  className="border-gray-300 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-50 transition-all"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingAdminTests ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
               <Button 
                 onClick={() => setShowTemplateDialog(true)} 
-                className="takeuforward-button"
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
               >
                 <Plus className="h-4 w-4 mr-2" /> Add New Test
               </Button>
             </div>
             
-            <div className="overflow-hidden rounded-lg border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium">Test Title</th>
-                    <th className="px-4 py-3 text-left font-medium">Subject</th>
-                    <th className="px-4 py-3 text-left font-medium">Date & Time</th>
-                    <th className="px-4 py-3 text-left font-medium">Registrations</th>
-                    <th className="px-4 py-3 text-left font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {upcomingTests.map((test) => (
-                    <tr key={test.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-4">
-                        <div className="font-medium">{test.title}</div>
-                        <div className="text-xs text-muted-foreground">{test.description}</div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <Badge className="bg-primary/80 text-primary-foreground">{test.subject}</Badge>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div>{test.date}</div>
-                        <div className="text-xs text-muted-foreground">{test.time}</div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div>{test.registrations}</div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" className="text-xs">
-                            <Edit className="h-3 w-3 mr-1" /> Edit
-                          </Button>
-                          <Button size="sm" variant="outline" className="text-xs text-red-500 hover:text-red-600">
-                            <Trash2 className="h-3 w-3 mr-1" /> Delete
-                          </Button>
-                        </div>
-                      </td>
+            <div className="overflow-hidden rounded-lg border shadow-sm">
+              {isLoadingAdminTests ? (
+                <div className="p-8 text-center">Loading tests...</div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Test Title</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Subject</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Status</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Date & Time</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Registrations</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y">
+                    {adminTests.length > 0 ? (
+                      adminTests.map((test) => (
+                        <tr key={test.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
+                          <td className="px-4 py-4">
+                            <div className="font-medium">{test.title}</div>
+                            <div className="text-xs text-muted-foreground">{test.description}</div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <Badge className="bg-blue-600 text-white font-medium">{test.subject}</Badge>
+                          </td>
+                          <td className="px-4 py-4">
+                            <Badge className={getStatusBadgeVariant(test.status)}>
+                              {test.status.charAt(0).toUpperCase() + test.status.slice(1)}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="font-medium">{test.date}</div>
+                            <div className="text-xs text-muted-foreground">{test.time}</div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="font-medium">{test.registrations}</div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-xs border-blue-200 hover:bg-blue-50 hover:border-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/30" 
+                                onClick={() => router.push(`/mock-test/edit/${test.id}`)}
+                              >
+                                <Edit className="h-3 w-3 mr-1" /> Edit
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-xs text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200 hover:border-red-300 dark:border-red-800/50 dark:hover:bg-red-900/30"
+                                onClick={() => handleDeleteTest(test.id)}
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" /> Delete
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-12 text-center">
+                          <div className="flex flex-col items-center">
+                            <div className="text-blue-300 dark:text-blue-700 mb-3">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"></path>
+                                <path d="M9 10h6"></path>
+                                <path d="M12 14v-4"></path>
+                              </svg>
+                            </div>
+                            <p className="text-muted-foreground">No tests found. Click &quot;Add New Test&quot; to create your first test.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
           </TabsContent>
         )}

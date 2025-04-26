@@ -175,6 +175,9 @@ export default function CreateTestPage() {
       return;
     }
     
+    // Get the index of the correct option (0 for A, 1 for B, etc.)
+    const correctOptionIndex = currentQuestion.options.findIndex(opt => opt.id === currentQuestion.correctAnswer);
+    
     // Construct payload for backend
     const payload = {
       subjects: [testDetails.subject || "Physics"],
@@ -190,7 +193,7 @@ export default function CreateTestPage() {
       answer: {
         type: "single_choice", // using single_choice for UI questions
         options: currentQuestion.options.map(opt => opt.text),
-        correct_answer: correctOption.text
+        correct_answer: correctOptionIndex.toString() // Send index (0-3) instead of text
       },
       tags: ["JEE", "Mechanics", "Friction"],
       status: "active",
@@ -315,19 +318,36 @@ export default function CreateTestPage() {
       // Here you would send the questions to the backend API
       // using the testId to associate them with the test
       
-      // For now, we'll just show a success message
+      // Update test status from draft to scheduled
+      const updateResponse = await fetch(`https://jee-simplified-api-226056335939.us-central1.run.app/api/tests/${testId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: 'scheduled'
+        })
+      });
+      
+      const updateData = await updateResponse.json();
+      
+      if (!updateData.success) {
+        throw new Error(updateData.message || 'Failed to update test status');
+      }
+      
+      // Show success message
       toast({
         title: "Success",
-        description: `Test "${testDetails.title}" created successfully with ${questions.length} questions!`
+        description: `Test "${testDetails.title}" published successfully with ${questions.length} questions!`
       });
       
       // Navigate back to the tests list
       router.push('/mock-test');
     } catch (error) {
-      console.error('Error submitting questions:', error);
+      console.error('Error publishing test:', error);
       toast({
         title: "Error",
-        description: "Failed to submit questions. Please try again.",
+        description: "Failed to publish test. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -595,7 +615,12 @@ export default function CreateTestPage() {
                   <ChevronLeft className="mr-2 h-4 w-4" /> Back to Details
                 </Button>
                 
-                <Button className="takeuforward-button" onClick={() => setActiveStep(3)}>
+                <Button 
+                  className="takeuforward-button" 
+                  onClick={() => setActiveStep(3)}
+                  disabled={questions.length < testDetails.questions}
+                  title={questions.length < testDetails.questions ? `Add ${testDetails.questions - questions.length} more questions to continue` : "Continue to review"}
+                >
                   Continue to Review <Check className="ml-2 h-4 w-4" />
                 </Button>
               </div>
@@ -690,7 +715,8 @@ export default function CreateTestPage() {
                 
                 <Button 
                   className="takeuforward-button"
-                  disabled={questions.length === 0}
+                  disabled={questions.length < testDetails.questions}
+                  title={questions.length < testDetails.questions ? `Add ${testDetails.questions - questions.length} more questions to continue` : "Continue to review"}
                   onClick={() => setActiveStep(3)}
                 >
                   Continue to Review
