@@ -6,7 +6,7 @@ export type TestTemplate = {
   template: {
     title: string;
     description: string;
-    subject: string;
+    subject: string[];
     questions: number;
     duration: number;
     difficulty: string;
@@ -16,7 +16,7 @@ export type TestTemplate = {
 export type TestDetails = {
   title: string;
   description: string;
-  subject: string;
+  subject: string[];
   questions: number;
   duration: number;
   difficulty: string;
@@ -38,7 +38,7 @@ export function useTestTemplate() {
         const template = JSON.parse(decodeURIComponent(templateParam));
         setTestDetails({
           ...currentDetails,
-          subject: template.subject || "Physics",
+          subject: Array.isArray(template.subject) ? template.subject : [template.subject || "Physics"],
           questions: template.questions || 25,
           duration: template.duration || 90,
           difficulty: template.difficulty || "Medium",
@@ -64,15 +64,10 @@ export function useTestTemplate() {
     setIsSaving(true);
 
     try {
-      // Transform subject to an array for API
-      const subjectArray = testDetails.subject.includes(',') 
-        ? testDetails.subject.split(',').map(s => s.trim()) 
-        : [testDetails.subject.trim()];
-
       const templateData = {
         name: templateName,
         description: templateDescription,
-        subject: subjectArray,
+        subject: testDetails.subject,
         questions: testDetails.questions,
         duration: testDetails.duration,
         difficulty: testDetails.difficulty

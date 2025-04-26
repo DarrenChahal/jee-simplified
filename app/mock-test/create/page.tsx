@@ -40,10 +40,10 @@ export default function CreateTestPage() {
   const [activeStep, setActiveStep] = useState(1)
   
   // Test details state
-  const [testDetails, setTestDetails] = useState<TestDetails>({
+  const [testDetails, setTestDetails] = useState<TestDetails & { subject: string[] }>({
     title: "",
     description: "",
-    subject: "Physics",
+    subject: ["Physics"],
     questions: 25,
     duration: 90,
     difficulty: "Medium",
@@ -95,13 +95,18 @@ export default function CreateTestPage() {
       const dateTimeString = `${testDetails.date}T${testDetails.time}:00`;
       const timestamp = new Date(dateTimeString).getTime();
       
+      // Convert subject to array if it's not already
+      const subjects = Array.isArray(testDetails.subject) 
+        ? testDetails.subject 
+        : testDetails.subject.split(',').map(s => s.trim());
+      
       // Prepare the request body
       const requestBody = {
         title: testDetails.title,
         description: testDetails.description,
         test_pattern: "none", // For now, just "none"
         created_by: "test@jeesimplified.com", // Will change after signin is implemented
-        subjects: [testDetails.subject], // Array of subjects
+        subjects: subjects, // Array of subjects
         difficulty: testDetails.difficulty,
         status: "draft",
         test_duration: testDetails.duration,
@@ -178,9 +183,14 @@ export default function CreateTestPage() {
     // Get the index of the correct option (0 for A, 1 for B, etc.)
     const correctOptionIndex = currentQuestion.options.findIndex(opt => opt.id === currentQuestion.correctAnswer);
     
+    // Get subjects as array
+    const subjects = Array.isArray(testDetails.subject) 
+      ? testDetails.subject 
+      : [testDetails.subject];
+    
     // Construct payload for backend
     const payload = {
-      subjects: [testDetails.subject || "Physics"],
+      subjects: subjects,
       for_class: ["11", "12", "dropper"],
       topics: ["Mechanics"],
       difficulty: testDetails.difficulty || "Medium",
@@ -456,21 +466,68 @@ export default function CreateTestPage() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="test-subject">Subject</Label>
-                <Select 
-                  value={testDetails.subject}
-                  onValueChange={(value) => setTestDetails({...testDetails, subject: value})}
-                >
-                  <SelectTrigger id="test-subject">
-                    <SelectValue placeholder="Select subject" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Physics">Physics</SelectItem>
-                    <SelectItem value="Chemistry">Chemistry</SelectItem>
-                    <SelectItem value="Mathematics">Mathematics</SelectItem>
-                    <SelectItem value="Combined">Combined</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="test-subject">Subject(s)</Label>
+                <div className="flex flex-wrap gap-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="physics-checkbox"
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      checked={testDetails.subject.includes("Physics")}
+                      onChange={(e) => {
+                        const updatedSubjects = e.target.checked
+                          ? Array.isArray(testDetails.subject)
+                            ? [...testDetails.subject, "Physics"]
+                            : ["Physics"]
+                          : Array.isArray(testDetails.subject)
+                            ? testDetails.subject.filter(s => s !== "Physics")
+                            : [];
+                        setTestDetails({...testDetails, subject: updatedSubjects});
+                      }}
+                    />
+                    <Label htmlFor="physics-checkbox" className="text-sm font-normal">Physics</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="chemistry-checkbox"
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      checked={testDetails.subject.includes("Chemistry")}
+                      onChange={(e) => {
+                        const updatedSubjects = e.target.checked
+                          ? Array.isArray(testDetails.subject)
+                            ? [...testDetails.subject, "Chemistry"]
+                            : ["Chemistry"]
+                          : Array.isArray(testDetails.subject)
+                            ? testDetails.subject.filter(s => s !== "Chemistry")
+                            : [];
+                        setTestDetails({...testDetails, subject: updatedSubjects});
+                      }}
+                    />
+                    <Label htmlFor="chemistry-checkbox" className="text-sm font-normal">Chemistry</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="mathematics-checkbox"
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      checked={testDetails.subject.includes("Mathematics")}
+                      onChange={(e) => {
+                        const updatedSubjects = e.target.checked
+                          ? Array.isArray(testDetails.subject)
+                            ? [...testDetails.subject, "Mathematics"]
+                            : ["Mathematics"]
+                          : Array.isArray(testDetails.subject)
+                            ? testDetails.subject.filter(s => s !== "Mathematics")
+                            : [];
+                        setTestDetails({...testDetails, subject: updatedSubjects});
+                      }}
+                    />
+                    <Label htmlFor="mathematics-checkbox" className="text-sm font-normal">Mathematics</Label>
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -771,7 +828,7 @@ export default function CreateTestPage() {
                 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-muted-foreground">Subject:</span> {testDetails.subject}
+                    <span className="text-muted-foreground">Subject:</span> {testDetails.subject.join(', ')}
                   </div>
                   <div>
                     <span className="text-muted-foreground">Questions:</span> {testDetails.questions}

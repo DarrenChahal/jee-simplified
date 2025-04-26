@@ -31,6 +31,7 @@ export default function MockTestPage() {
     title: string;
     description: string;
     subject: string;
+    subjects?: string[];
     questions: number;
     duration: number;
     difficulty: string;
@@ -51,6 +52,7 @@ export default function MockTestPage() {
     title: string;
     description: string;
     subject: string;
+    subjects: string[];
     status: string;
     date: string;
     time: string;
@@ -68,6 +70,7 @@ export default function MockTestPage() {
     title: string;
     description: string;
     subject: string;
+    subjects: string[];
     questions: number;
     duration: number;
     difficulty: string;
@@ -92,6 +95,16 @@ export default function MockTestPage() {
     registrations?: number;
     registered_count: number;
     status: string;
+  }
+  
+  interface Template {
+    _id: string;
+    name: string;
+    description: string;
+    subject: string | string[];
+    questions: number;
+    duration: number;
+    difficulty: string;
   }
 
   // Past mock tests data
@@ -289,6 +302,7 @@ export default function MockTestPage() {
     title: string;
     description: string;
     subject: string;
+    subjects?: string[];
     questions: number;
     duration: number;
     difficulty: string;
@@ -356,13 +370,11 @@ export default function MockTestPage() {
 
   // Apply template to new test
   const applyTemplate = (template: Template) => {
-    // Convert subject array to string for compatibility with current implementation
-    const subjectStr = Array.isArray(template.subject) ? template.subject.join(', ') : template.subject
-    
+    // Keep subjects as an array
     const formattedTemplate = {
       title: "",
       description: "",
-      subject: subjectStr,
+      subject: Array.isArray(template.subject) ? template.subject : [template.subject],
       questions: template.questions,
       duration: template.duration,
       difficulty: template.difficulty
@@ -444,6 +456,7 @@ export default function MockTestPage() {
             title: test.title,
             description: test.description,
             subject: test.subjects?.[0] || "N/A",
+            subjects: test.subjects || ["N/A"],
             status: test.status,
             date: formattedDate,
             time: formattedTime,
@@ -561,6 +574,7 @@ export default function MockTestPage() {
             title: test.title,
             description: test.description,
             subject: Array.isArray(test.subjects) ? test.subjects[0] : (test.subject || "General"),
+            subjects: Array.isArray(test.subjects) ? test.subjects : [test.subject || "General"],
             questions: test.questions || 25,
             duration: test.test_duration || test.duration || 90,
             difficulty: test.difficulty || "Medium",
@@ -761,9 +775,14 @@ export default function MockTestPage() {
                     <h3 className="font-medium text-md">{template.name}</h3>
                     <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
                     <div className="flex flex-wrap gap-2 mt-2">
-                      <Badge variant="outline" className="text-xs">
-                        {Array.isArray(template.subject) ? template.subject.join(', ') : template.subject}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        {Array.isArray(template.subject) 
+                          ? template.subject.map((subj: string, idx: number) => (
+                              <Badge key={idx} variant="outline" className="text-xs">{subj}</Badge>
+                            ))
+                          : <Badge variant="outline" className="text-xs">{template.subject}</Badge>
+                        }
+                      </div>
                       <Badge variant="outline" className="text-xs">
                         {template.questions} Questions
                       </Badge>
@@ -902,7 +921,11 @@ export default function MockTestPage() {
                             <div className="text-xs text-muted-foreground">{test.description}</div>
                           </td>
                           <td className="px-4 py-4">
-                            <Badge className="bg-blue-600 text-white font-medium">{test.subject}</Badge>
+                            <div className="flex flex-wrap gap-1">
+                              {test.subjects?.map((subj: string, idx: number) => (
+                                <Badge key={idx} className="bg-blue-600 text-white font-medium">{subj}</Badge>
+                              ))}
+                            </div>
                           </td>
                           <td className="px-4 py-4">
                             <Badge className={getStatusBadgeVariant(test.status)}>
@@ -977,7 +1000,11 @@ export default function MockTestPage() {
                 <Card key={test.id} className="takeuforward-card overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/20">
                   <div className="p-6">
                     <div className="flex justify-between items-start mb-4">
-                      <Badge className="bg-primary/80 text-primary-foreground">{test.subject}</Badge>
+                      <div className="flex flex-wrap gap-1">
+                        {test.subjects?.map((subj: string, idx: number) => (
+                          <Badge key={idx} className="bg-primary/80 text-primary-foreground">{subj}</Badge>
+                        ))}
+                      </div>
                       <Badge variant="outline" className={
                         test.difficulty === "Hard" ? "border-red-500 text-red-500" :
                         test.difficulty === "Medium" ? "border-amber-500 text-amber-500" :
