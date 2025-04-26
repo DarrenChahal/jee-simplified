@@ -1,4 +1,6 @@
 import { TemplatesContainer } from './templates-container';
+import { QuestionsContainer } from './questions-container';
+import { TestsContainer } from './tests-container';
 
 export default function MockTestLayout({
   children,
@@ -7,7 +9,11 @@ export default function MockTestLayout({
 }) {
   return (
     <TemplatesContainer>
-      {children}
+      <QuestionsContainer>
+        <TestsContainer>
+          {children}
+        </TestsContainer>
+      </QuestionsContainer>
     </TemplatesContainer>
   );
 } 

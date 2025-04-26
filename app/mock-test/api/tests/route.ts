@@ -1,0 +1,109 @@
+import { NextResponse } from 'next/server';
+
+const API_URL = 'https://jee-simplified-api-226056335939.us-central1.run.app/api/tests';
+
+export async function GET() {
+  try {
+    const response = await fetch(API_URL, { 
+      cache: 'no-store'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API returned status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Error fetching tests:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch tests' }, 
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Error creating test:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to create test' }, 
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const id = body._id;
+    
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Test ID is required' }, 
+        { status: 400 }
+      );
+    }
+    
+    const response = await fetch(`${API_URL}/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Error updating test:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to update test' }, 
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id');
+    
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Test ID is required' }, 
+        { status: 400 }
+      );
+    }
+    
+    const response = await fetch(`${API_URL}/${id}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API returned status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Error deleting test:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete test' }, 
+      { status: 500 }
+    );
+  }
+} 

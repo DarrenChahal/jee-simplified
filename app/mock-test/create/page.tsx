@@ -110,8 +110,8 @@ export default function CreateTestPage() {
         are_questions_public: false // Default value
       };
       
-      // Send the request to the backend
-      const response = await fetch('https://jee-simplified-api-226056335939.us-central1.run.app/api/tests', {
+      // Send the request to the backend using our new API route
+      const response = await fetch('/mock-test/api/tests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -200,9 +200,9 @@ export default function CreateTestPage() {
       created_by: "test@jeesimplified.com"
     };
     
-    // Send POST request to backend
+    // Send POST request to backend using our new API route
     try {
-      const response = await fetch("https://jee-simplified-api-226056335939.us-central1.run.app/api/questions", {
+      const response = await fetch("/mock-test/api/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -315,16 +315,14 @@ export default function CreateTestPage() {
     setIsSubmitting(true);
     
     try {
-      // Here you would send the questions to the backend API
-      // using the testId to associate them with the test
-      
-      // Update test status from draft to scheduled
-      const updateResponse = await fetch(`https://jee-simplified-api-226056335939.us-central1.run.app/api/tests/${testId}`, {
+      // Update test status from draft to scheduled using our new API route
+      const updateResponse = await fetch('/mock-test/api/tests', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+          _id: testId,
           status: 'scheduled'
         })
       });
@@ -372,6 +370,9 @@ export default function CreateTestPage() {
       description: "Preview functionality will be implemented soon"
     });
   }
+  
+  // Check if we have added enough questions
+  const hasEnoughQuestions = questions.length >= testDetails.questions;
   
   return (
     <div className="container py-8">
@@ -618,8 +619,8 @@ export default function CreateTestPage() {
                 <Button 
                   className="takeuforward-button" 
                   onClick={() => setActiveStep(3)}
-                  disabled={questions.length < testDetails.questions}
-                  title={questions.length < testDetails.questions ? `Add ${testDetails.questions - questions.length} more questions to continue` : "Continue to review"}
+                  disabled={!hasEnoughQuestions}
+                  title={!hasEnoughQuestions ? `Add ${testDetails.questions - questions.length} more questions to continue` : "Continue to review"}
                 >
                   Continue to Review <Check className="ml-2 h-4 w-4" />
                 </Button>
@@ -627,103 +628,122 @@ export default function CreateTestPage() {
             </Card>
           )}
           
-          {/* Add New Question Form */}
-          <Card className="p-6">
-            <h3 className="text-lg font-medium mb-4">
-              {currentQuestion.isEditMode ? "Edit Question" : "Add New Question"}
-            </h3>
-            
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="question-text">Question Text</Label>
-                <Input 
-                  id="question-text" 
-                  placeholder="Enter the question text" 
-                  value={currentQuestion.text}
-                  onChange={(e) => setCurrentQuestion({
-                    ...currentQuestion,
-                    text: e.target.value
-                  })}
-                />
+          {/* Add New Question Form - Hide when we have enough questions */}
+          {!hasEnoughQuestions && (
+            <Card className="p-6">
+              {/* Display progress message */}
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-md">
+                <p className="text-blue-700 dark:text-blue-400 text-sm">
+                  {questions.length === 0 
+                    ? `Please add ${testDetails.questions} questions to continue.` 
+                    : questions.length === 1
+                    ? `You've added 1 question. ${testDetails.questions - questions.length} more ${testDetails.questions - questions.length === 1 ? 'question is' : 'questions are'} required.`
+                    : `You've added ${questions.length} questions. ${testDetails.questions - questions.length} more ${testDetails.questions - questions.length === 1 ? 'question is' : 'questions are'} required.`
+                  }
+                </p>
               </div>
               
-              <div className="space-y-4">
-                <Label>Answer Options</Label>
-                {currentQuestion.options.map((option, index) => (
-                  <div key={option.id} className="flex items-center gap-4">
-                    <div className="w-8 h-8 flex items-center justify-center bg-muted rounded-md font-medium">
-                      {option.id.toUpperCase()}
-                    </div>
-                    <Input 
-                      placeholder={`Option ${option.id.toUpperCase()}`} 
-                      value={option.text}
-                      onChange={(e) => {
-                        const newOptions = [...currentQuestion.options];
-                        newOptions[index].text = e.target.value;
-                        setCurrentQuestion({
-                          ...currentQuestion,
-                          options: newOptions
-                        });
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
+              <h3 className="text-lg font-medium mb-4">
+                {currentQuestion.isEditMode ? "Edit Question" : "Add New Question"}
+              </h3>
               
-              <div className="space-y-2">
-                <Label htmlFor="correct-answer">Correct Answer</Label>
-                <Select 
-                  value={currentQuestion.correctAnswer}
-                  onValueChange={(value) => setCurrentQuestion({
-                    ...currentQuestion,
-                    correctAnswer: value
-                  })}
-                >
-                  <SelectTrigger id="correct-answer">
-                    <SelectValue placeholder="Select correct answer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="a">Option A</SelectItem>
-                    <SelectItem value="b">Option B</SelectItem>
-                    <SelectItem value="c">Option C</SelectItem>
-                    <SelectItem value="d">Option D</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="flex justify-end gap-4 mt-6">
-              <Button 
-                variant="outline" 
-                onClick={resetQuestionForm}
-              >
-                {currentQuestion.isEditMode ? "Cancel Edit" : "Clear Form"}
-              </Button>
-              <Button 
-                className="takeuforward-button" 
-                onClick={handleAddQuestion}
-              >
-                {currentQuestion.isEditMode ? "Update Question" : "Add Question"}
-              </Button>
-            </div>
-            
-            {questions.length === 0 && (
-              <div className="mt-8 pt-6 border-t flex justify-between">
-                <Button variant="outline" onClick={() => setActiveStep(1)}>
-                  <ChevronLeft className="mr-2 h-4 w-4" /> Back to Details
-                </Button>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="question-text">Question Text</Label>
+                  <Input 
+                    id="question-text" 
+                    placeholder="Enter the question text" 
+                    value={currentQuestion.text}
+                    onChange={(e) => setCurrentQuestion({
+                      ...currentQuestion,
+                      text: e.target.value
+                    })}
+                  />
+                </div>
                 
+                <div className="space-y-4">
+                  <Label>Answer Options</Label>
+                  {currentQuestion.options.map((option, index) => (
+                    <div key={option.id} className="flex items-center gap-4">
+                      <div className="w-8 h-8 flex items-center justify-center bg-muted rounded-md font-medium">
+                        {option.id.toUpperCase()}
+                      </div>
+                      <Input 
+                        placeholder={`Option ${option.id.toUpperCase()}`} 
+                        value={option.text}
+                        onChange={(e) => {
+                          const newOptions = [...currentQuestion.options];
+                          newOptions[index].text = e.target.value;
+                          setCurrentQuestion({
+                            ...currentQuestion,
+                            options: newOptions
+                          });
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="correct-answer">Correct Answer</Label>
+                  <Select 
+                    value={currentQuestion.correctAnswer}
+                    onValueChange={(value) => setCurrentQuestion({
+                      ...currentQuestion,
+                      correctAnswer: value
+                    })}
+                  >
+                    <SelectTrigger id="correct-answer">
+                      <SelectValue placeholder="Select correct answer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="a">Option A</SelectItem>
+                      <SelectItem value="b">Option B</SelectItem>
+                      <SelectItem value="c">Option C</SelectItem>
+                      <SelectItem value="d">Option D</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-4 mt-6">
                 <Button 
-                  className="takeuforward-button"
-                  disabled={questions.length < testDetails.questions}
-                  title={questions.length < testDetails.questions ? `Add ${testDetails.questions - questions.length} more questions to continue` : "Continue to review"}
-                  onClick={() => setActiveStep(3)}
+                  variant="outline" 
+                  onClick={resetQuestionForm}
                 >
-                  Continue to Review
+                  {currentQuestion.isEditMode ? "Cancel Edit" : "Clear Form"}
+                </Button>
+                <Button 
+                  className="takeuforward-button" 
+                  onClick={handleAddQuestion}
+                >
+                  {currentQuestion.isEditMode ? "Update Question" : "Add Question"}
                 </Button>
               </div>
-            )}
-          </Card>
+              
+              {questions.length === 0 && (
+                <div className="mt-8 pt-6 border-t flex justify-between">
+                  <Button variant="outline" onClick={() => setActiveStep(1)}>
+                    <ChevronLeft className="mr-2 h-4 w-4" /> Back to Details
+                  </Button>
+                </div>
+              )}
+            </Card>
+          )}
+          
+          {/* Show a message when enough questions have been added */}
+          {hasEnoughQuestions && !questions[0]?.text.includes("editing") && (
+            <Card className="p-6 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-medium text-green-800 dark:text-green-400">All Required Questions Added</h3>
+                  <p className="text-green-700 dark:text-green-500 mt-1">
+                    You&apos;ve added all {questions.length} questions needed for this test. You can now continue to review.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
         </div>
       )}
       

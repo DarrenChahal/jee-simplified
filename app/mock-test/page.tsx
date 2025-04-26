@@ -27,7 +27,7 @@ export default function MockTestPage() {
   const [activeTab, setActiveTab] = useState("upcoming-tests")
   const [isTestStarted, setIsTestStarted] = useState(false)
   const [selectedTest, setSelectedTest] = useState<{
-    id?: number;
+    id?: string;
     title: string;
     description: string;
     subject: string;
@@ -62,50 +62,42 @@ export default function MockTestPage() {
   // Mock user role for demonstration - this would normally come from an auth system
   const [userRole] = useState("admin") // For testing purposes, set to "admin"
 
-  // Upcoming mock tests data
-  const upcomingTests = [
-    {
-      id: 1,
-      title: "JEE Advanced Physics Mock Test",
-      description: "Comprehensive test covering mechanics, electromagnetism, and modern physics.",
-      subject: "Physics",
-      questions: 25,
-      duration: 90, // minutes
-      difficulty: "Hard",
-      date: "Mar 25, 2024",
-      time: "10:00 AM",
-      registrations: 245,
-    },
-    {
-      id: 2,
-      title: "JEE Main Chemistry Full Test",
-      description: "Complete mock test covering organic, inorganic, and physical chemistry.",
-      subject: "Chemistry",
-      questions: 30,
-      duration: 60, // minutes 
-      difficulty: "Medium",
-      date: "Mar 28, 2024",
-      time: "2:00 PM",
-      registrations: 312,
-    },
-    {
-      id: 3,
-      title: "JEE Mathematics Practice Test",
-      description: "Focused test on calculus, algebra, and coordinate geometry.",
-      subject: "Mathematics",
-      questions: 25,
-      duration: 90, // minutes
-      difficulty: "Medium",
-      date: "Apr 2, 2024",
-      time: "9:00 AM",
-      registrations: 189,
-    },
-  ]
+  // Add state for upcoming tests
+  const [upcomingTests, setUpcomingTests] = useState<{
+    id: string;
+    title: string;
+    description: string;
+    subject: string;
+    questions: number;
+    duration: number;
+    difficulty: string;
+    date: string;
+    time: string;
+    registrations: number;
+  }[]>([])
+  const [isLoadingUpcomingTests, setIsLoadingUpcomingTests] = useState(false)
+
+  // Define API test data interface
+  interface APITest {
+    _id: string;
+    title: string;
+    description: string;
+    subjects?: string[];
+    subject?: string;
+    questions?: number;
+    test_duration?: number;
+    duration?: number;
+    difficulty?: string;
+    test_date: number;
+    registrations?: number;
+    registered_count: number;
+    status: string;
+  }
 
   // Past mock tests data
   const pastTests = [
     {
-      id: 1,
+      id: '1',
       title: "Weekly Contest 437",
       description: "JEE Advanced level physics and mathematics problems.",
       date: "Feb 16, 2024",
@@ -116,7 +108,7 @@ export default function MockTestPage() {
       difficulty: "Hard",
     },
     {
-      id: 2,
+      id: '2',
       title: "Biweekly Contest 150",
       description: "JEE Main level chemistry and physics problems.",
       date: "Feb 15, 2024",
@@ -127,7 +119,7 @@ export default function MockTestPage() {
       difficulty: "Medium",
     },
     {
-      id: 3,
+      id: '3',
       title: "Weekly Contest 421",
       description: "JEE Advanced level mathematics problems.",
       date: "Oct 27, 2023",
@@ -138,7 +130,7 @@ export default function MockTestPage() {
       difficulty: "Hard",
     },
     {
-      id: 4,
+      id: '4',
       title: "Weekly Contest 420",
       description: "JEE Main level physics problems.",
       date: "Oct 20, 2023",
@@ -293,7 +285,7 @@ export default function MockTestPage() {
   };
 
   const handleStartTest = (test: {
-    id?: number;
+    id?: string;
     title: string;
     description: string;
     subject: string;
@@ -304,7 +296,12 @@ export default function MockTestPage() {
     time: string;
     registrations?: number;
   }) => {
-    setSelectedTest(test);
+    // Make sure we store the test data with consistent id type
+    const formattedTest = {
+      ...test,
+      id: test.id?.toString() // Convert the id to string for consistency
+    };
+    setSelectedTest(formattedTest);
     setIsTestStarted(true);
     setTimeRemaining(test.duration * 60); // Convert minutes to seconds
   };
@@ -318,7 +315,7 @@ export default function MockTestPage() {
 
   // For past tests, ensure we have the required properties
   const handleStartPastTest = (test: {
-    id: number;
+    id: string;
     title: string;
     description: string;
     date: string;
@@ -530,6 +527,64 @@ export default function MockTestPage() {
       setShowDeleteConfirmDialog(false)
     }
   }
+
+  // Function to fetch upcoming (scheduled) tests
+  const fetchUpcomingTests = async () => {
+    setIsLoadingUpcomingTests(true)
+    try {
+      const response = await fetch('https://jee-simplified-api-226056335939.us-central1.run.app/api/tests?status=scheduled')
+      
+      if (!response.ok) {
+        console.error('Failed to fetch upcoming tests:', response.status)
+        return
+      }
+      
+      const data = await response.json()
+      
+      if (data.success && data.data && data.data.documents) {
+        const formattedTests = data.data.documents.map((test: APITest) => {
+          // Convert timestamp to readable date and time
+          const testDate = new Date(test.test_date || Date.now())
+          const formattedDate = testDate.toLocaleDateString('en-US', {
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric'
+          })
+          const formattedTime = testDate.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          })
+          
+          return {
+            id: test._id,
+            title: test.title,
+            description: test.description,
+            subject: Array.isArray(test.subjects) ? test.subjects[0] : (test.subject || "General"),
+            questions: test.questions || 25,
+            duration: test.test_duration || test.duration || 90,
+            difficulty: test.difficulty || "Medium",
+            date: formattedDate,
+            time: formattedTime,
+            registrations: test.registered_count || 0
+          }
+        })
+        
+        setUpcomingTests(formattedTests)
+      }
+    } catch (error) {
+      console.error('Error fetching upcoming tests:', error)
+    } finally {
+      setIsLoadingUpcomingTests(false)
+    }
+  }
+
+  // Fetch upcoming tests when component mounts and when tab changes to upcoming-tests
+  useEffect(() => {
+    if (activeTab === "upcoming-tests") {
+      fetchUpcomingTests()
+    }
+  }, [activeTab])
 
   if (isTestStarted) {
     return (
@@ -908,54 +963,64 @@ export default function MockTestPage() {
         
         {/* Upcoming Mock Tests Tab */}
         <TabsContent value="upcoming-tests" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {upcomingTests.map((test) => (
-              <Card key={test.id} className="takeuforward-card overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/20">
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <Badge className="bg-primary/80 text-primary-foreground">{test.subject}</Badge>
-                    <Badge variant="outline" className={
-                      test.difficulty === "Hard" ? "border-red-500 text-red-500" :
-                      test.difficulty === "Medium" ? "border-amber-500 text-amber-500" :
-                      "border-green-500 text-green-500"
-                    }>
-                      {test.difficulty}
-                    </Badge>
+          {isLoadingUpcomingTests ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : upcomingTests.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No upcoming tests are scheduled at the moment.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {upcomingTests.map((test) => (
+                <Card key={test.id} className="takeuforward-card overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/20">
+                  <div className="p-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <Badge className="bg-primary/80 text-primary-foreground">{test.subject}</Badge>
+                      <Badge variant="outline" className={
+                        test.difficulty === "Hard" ? "border-red-500 text-red-500" :
+                        test.difficulty === "Medium" ? "border-amber-500 text-amber-500" :
+                        "border-green-500 text-green-500"
+                      }>
+                        {test.difficulty}
+                      </Badge>
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">{test.title}</h3>
+                    <p className="text-muted-foreground text-sm mb-4">{test.description}</p>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        <span>{test.date}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <Clock className="h-4 w-4 mr-1" />
+                        <span>{test.time}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground mb-6">
+                      <div className="flex items-center">
+                        <HelpCircle className="h-4 w-4 mr-1" />
+                        <span>{test.questions} Questions</span>
+                      </div>
+                      <div className="flex items-center">
+                        <Timer className="h-4 w-4 mr-1" />
+                        <span>{test.duration} Minutes</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground">
+                        <span className="font-medium text-primary">{test.registrations}</span> registrations
+                      </div>
+                      <Button className="takeuforward-button" onClick={() => handleStartTest(test)}>
+                        Register
+                      </Button>
+                    </div>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">{test.title}</h3>
-                  <p className="text-muted-foreground text-sm mb-4">{test.description}</p>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      <span>{test.date}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Clock className="h-4 w-4 mr-1" />
-                      <span>{test.time}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground mb-6">
-                    <div className="flex items-center">
-                      <HelpCircle className="h-4 w-4 mr-1" />
-                      <span>{test.questions} Questions</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Timer className="h-4 w-4 mr-1" />
-                      <span>{test.duration} Minutes</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs text-muted-foreground">
-                      <span className="font-medium text-primary">{test.registrations}</span> registrations
-                    </div>
-                    <Button className="takeuforward-button" onClick={() => handleStartTest(test)}>
-                      Register
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
         
         {/* Past Mock Tests Tab */}
