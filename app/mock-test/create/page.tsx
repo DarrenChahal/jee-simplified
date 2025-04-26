@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronLeft, Edit, Trash2, Check, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -13,7 +13,17 @@ import { SaveTemplateDialog } from "@/components/mock-test/SaveTemplateDialog"
 import { useTestTemplate, TestDetails } from "../hooks/useTestTemplate"
 import { toast } from "@/components/ui/use-toast"
 
+// Main page component with Suspense boundary
 export default function CreateTestPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><p>Loading...</p></div>}>
+      <CreateTestContent />
+    </Suspense>
+  )
+}
+
+// Component that uses useSearchParams
+function CreateTestContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const templateParam = searchParams.get('template')
@@ -74,7 +84,9 @@ export default function CreateTestPage() {
   
   // Load template from URL params if provided
   useEffect(() => {
-    loadTemplateFromParams(templateParam, setTestDetails, testDetails)
+    if (templateParam) {
+      loadTemplateFromParams(templateParam, setTestDetails, testDetails)
+    }
   }, [templateParam])
   
   // Submit test details and move to questions step
@@ -98,7 +110,7 @@ export default function CreateTestPage() {
       // Convert subject to array if it's not already
       const subjects = Array.isArray(testDetails.subject) 
         ? testDetails.subject 
-        : testDetails.subject.split(',').map(s => s.trim());
+        : [testDetails.subject];
       
       // Prepare the request body
       const requestBody = {
