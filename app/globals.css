@@ -533,3 +533,9 @@
     box-shadow: 0 0 0 0 rgba(var(--primary), 0);
   }
 }
+
+.katex-display {
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}

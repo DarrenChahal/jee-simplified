@@ -12,6 +12,9 @@ import { Label } from "@/components/ui/label"
 import { SaveTemplateDialog } from "@/components/mock-test/SaveTemplateDialog"
 import { useTestTemplate, TestDetails } from "../hooks/useTestTemplate"
 import { toast } from "@/components/ui/use-toast"
+import {BlockMath} from 'react-katex'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
 
 // Main page component with Suspense boundary
 export default function CreateTestPage() {
@@ -395,6 +398,20 @@ function CreateTestContent() {
   
   // Check if we have added enough questions
   const hasEnoughQuestions = questions.length >= testDetails.questions;
+
+  const [showPreview, setShowPreview] = useState(false);
+  const [latexErrors, setLatexErrors] = useState<Record<number, string | null>>({});
+
+
+  const validateLatex = (latex: string, index: number) => {
+    try {
+      katex.renderToString(latex);
+      setLatexErrors(prev => ({ ...prev, [index]: null }));
+    } catch (err) {
+      setLatexErrors(prev => ({ ...prev, [index]: 'Invalid LaTeX syntax.' + {err}}));
+    }
+  };
+
   
   return (
     <div className="container py-8">
@@ -712,46 +729,82 @@ function CreateTestContent() {
                 </p>
               </div>
               
-              <h3 className="text-lg font-medium mb-4">
-                {currentQuestion.isEditMode ? "Edit Question" : "Add New Question"}
-              </h3>
-              
               <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold">
+                    {currentQuestion.isEditMode ? "Edit Question" : "Add New Question"}
+                  </h3>
+                  <button
+                    onClick={() => setShowPreview(!showPreview)}
+                    className="text-sm text-blue-600 hover:underline"
+                  >
+                    {showPreview ? 'Hide Preview' : 'Show Preview'}
+                  </button>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="question-text">Question Text</Label>
-                  <Input 
-                    id="question-text" 
-                    placeholder="Enter the question text" 
+                  <textarea
+                    id="question-text"
+                    placeholder="Enter the question text"
                     value={currentQuestion.text}
-                    onChange={(e) => setCurrentQuestion({
-                      ...currentQuestion,
-                      text: e.target.value
-                    })}
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      setCurrentQuestion({ ...currentQuestion, text });
+                      validateLatex(text, -1); 
+                    }}
+                    className="w-full min-h-[100px] p-3 border border-gray-300 rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={3}
                   />
+                  {latexErrors && <p className="text-red-600 text-sm">{latexErrors[-1]}</p>}
+                  {showPreview && !latexErrors[-1] && (
+                    <div className="border rounded p-4 bg-gray-50 mt-2 break-words">
+                      <div className="overflow-x-auto">
+                        <BlockMath math={currentQuestion.text} />
+                      </div>
+                    </div>
+                  )}
                 </div>
-                
                 <div className="space-y-4">
                   <Label>Answer Options</Label>
                   {currentQuestion.options.map((option, index) => (
-                    <div key={option.id} className="flex items-center gap-4">
-                      <div className="w-8 h-8 flex items-center justify-center bg-muted rounded-md font-medium">
-                        {option.id.toUpperCase()}
+                    <div key={option.id} className="flex flex-col gap-2">
+                      <div className="flex items-start gap-4">
+                        <div className="w-8 h-8 flex items-center justify-center bg-muted rounded-md font-medium flex-shrink-0 mt-1">
+                          {option.id.toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <textarea
+                            placeholder={`Option ${option.id.toUpperCase()}`}
+                            value={option.text}
+                            onChange={(e) => {
+                              const newText = e.target.value;
+                              const newOptions = [...currentQuestion.options];
+                              newOptions[index].text = newText;
+                              setCurrentQuestion({ ...currentQuestion, options: newOptions });
+                              validateLatex(newText, index);
+                            }}
+                            className="w-full min-h-[60px] p-2 border border-gray-300 rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            rows={2}
+                          />
+                          {latexErrors[index] && (
+                            <p className="text-red-600 text-sm mt-1">{latexErrors[index]}</p>
+                          )}
+                        </div>
                       </div>
-                      <Input 
-                        placeholder={`Option ${option.id.toUpperCase()}`} 
-                        value={option.text}
-                        onChange={(e) => {
-                          const newOptions = [...currentQuestion.options];
-                          newOptions[index].text = e.target.value;
-                          setCurrentQuestion({
-                            ...currentQuestion,
-                            options: newOptions
-                          });
-                        }}
-                      />
+                      {showPreview && !latexErrors[index] && (
+                        <div className="ml-12">
+                          <div className="border rounded p-3 bg-gray-50 break-words">
+                            <div className="overflow-x-auto">
+                              <BlockMath math={option.text} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
+
                 
                 <div className="space-y-2">
                   <Label htmlFor="correct-answer">Correct Answer</Label>

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 
+import createTest from '@/mocks/tests/create-test.json';
+
 const API_URL = 'https://jee-simplified-api-226056335939.us-central1.run.app/api/tests';
+const useMock = 'true';
 
 export async function GET() {
   try {
@@ -26,7 +29,10 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    
+    if (useMock) {
+      console.log("Returning mock test");
+      return NextResponse.json(createTest);
+    }
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
