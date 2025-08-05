@@ -23,7 +23,7 @@ export interface Test {
 export const getTests = cache(async (): Promise<Test[]> => {
   try {
     // Use relative URL for server-side fetch
-    const response = await fetch('https://jee-simplified-api-226056335939.us-central1.run.app/api/tests');
+    const response = await fetch('https://jee-simplified-api-1075829581.us-central1.run.app/api/tests');
     
     if (!response.ok) {
       console.error(`Error fetching tests: ${response.status}`);

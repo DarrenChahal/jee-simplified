@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 
 import createTest from '@/mocks/tests/create-test.json';
 
-const API_URL = 'https://jee-simplified-api-226056335939.us-central1.run.app/api/tests';
-const useMock = 'true';
+// const API_URL = 'https://jee-simplified-api-1075829581.us-central1.run.app/api/tests';
+const API_URL = 'http://localhost:8080/api/tests';
+const useMock = false;
 
 export async function GET() {
   try {
