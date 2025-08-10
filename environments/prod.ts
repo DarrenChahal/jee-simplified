@@ -17,7 +17,7 @@ export const apiUrls = {
   users: {
     profile: `${BASE_API_URL}/users/profile`,
     updateProfile: `${BASE_API_URL}/users/update`,
-    // Add more user-related routes here
+    registerForTest: `${BASE_API_URL}/users/test-registration/`,
   },
 
 };

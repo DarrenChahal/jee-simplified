@@ -126,8 +126,9 @@ function CreateTestContent() {
         status: "draft",
         test_duration: testDetails.duration,
         test_date: timestamp,
-        max_score: 100, // Default score, can be made configurable later
-        are_questions_public: false // Default value
+        max_score: testDetails.questions*4, // Default score, can be made configurable later
+        are_questions_public: false, // Default value
+        questions: testDetails.questions, // Number of questions
       };
       
       // Send the request to the backend using our new API route

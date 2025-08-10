@@ -320,6 +320,47 @@ export default function MockTestPage() {
     setTimeRemaining(test.duration * 60); // Convert minutes to seconds
   };
 
+  const handleTestRegistration = async (test: {
+  id?: string;
+  title: string;
+  description: string;
+  subject: string;
+  subjects?: string[];
+  questions: number;
+  duration: number;
+  difficulty: string;
+  date: string;
+  time: string;
+  registrations?: number;
+}) => {
+  try {
+    const bodyData = {
+      user_email: "",
+      test_id: test.id,
+    }
+    const response = await fetch('/api/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(bodyData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('User registered for test:', data);
+
+    // You can show success message or redirect here
+  } catch (error) {
+    console.error('Registration failed:', error);
+    // Show error to the user
+  }
+};
+
+
   // Format time remaining as MM:SS
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -557,7 +598,7 @@ export default function MockTestPage() {
       if (data.success && data.data && data.data.documents) {
         const formattedTests = data.data.documents.map((test: APITest) => {
           // Convert timestamp to readable date and time
-          const testDate = new Date(test.test_date || Date.now())
+          const testDate = new Date(test.test_date)
           const formattedDate = testDate.toLocaleDateString('en-US', {
             month: 'short', 
             day: 'numeric', 
@@ -575,12 +616,12 @@ export default function MockTestPage() {
             description: test.description,
             subject: Array.isArray(test.subjects) ? test.subjects[0] : (test.subject || "General"),
             subjects: Array.isArray(test.subjects) ? test.subjects : [test.subject || "General"],
-            questions: test.questions || 25,
-            duration: test.test_duration || test.duration || 90,
-            difficulty: test.difficulty || "Medium",
+            questions: test.questions,
+            duration: test.test_duration,
+            difficulty: test.difficulty,
             date: formattedDate,
             time: formattedTime,
-            registrations: test.registered_count || 0
+            registrations: test.registered_count
           }
         })
         
