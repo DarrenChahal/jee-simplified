@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const API_URL = 'https://jee-simplified-api-1075829581.us-central1.run.app/api/templates';
+const API_URL = 'https://jee-simplified-api-274150960347.us-central1.run.app/api/templates';
 
 export async function GET() {
   try {

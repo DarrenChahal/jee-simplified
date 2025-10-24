@@ -1,4 +1,4 @@
-const BASE_API_URL = "https://jee-simplified-api-1075829581.us-central1.run.app/api";
+const BASE_API_URL = "https://jee-simplified-api-274150960347.us-central1.run.app/api";
 
 export const apiUrls = {
   tests: {

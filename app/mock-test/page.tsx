@@ -464,7 +464,7 @@ export default function MockTestPage() {
   const fetchAdminTests = async () => {
     setIsLoadingAdminTests(true)
     try {
-      const response = await fetch('https://jee-simplified-api-1075829581.us-central1.run.app/api/tests')
+      const response = await fetch('https://jee-simplified-api-274150960347.us-central1.run.app/api/tests')
       const data = await response.json()
       
       if (data.success) {
@@ -545,7 +545,7 @@ export default function MockTestPage() {
     
     setIsDeleting(testToDelete)
     try {
-      const response = await fetch(`https://jee-simplified-api-1075829581.us-central1.run.app/api/tests/${testToDelete}`, {
+      const response = await fetch(`https://jee-simplified-api-274150960347.us-central1.run.app/api/tests/${testToDelete}`, {
         method: 'DELETE'
       })
       
@@ -586,7 +586,7 @@ export default function MockTestPage() {
   const fetchUpcomingTests = async () => {
     setIsLoadingUpcomingTests(true)
     try {
-      const response = await fetch('https://jee-simplified-api-1075829581.us-central1.run.app/api/tests?status=scheduled')
+      const response = await fetch('https://jee-simplified-api-274150960347.us-central1.run.app/api/tests?status=scheduled')
       
       if (!response.ok) {
         console.error('Failed to fetch upcoming tests:', response.status)

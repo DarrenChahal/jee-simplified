@@ -26,7 +26,7 @@ export interface Question {
 export const getQuestions = cache(async (): Promise<Question[]> => {
   try {
     // Use relative URL for server-side fetch
-    const response = await fetch('https://jee-simplified-api-1075829581.us-central1.run.app/api/questions');
+    const response = await fetch('https://jee-simplified-api-274150960347.us-central1.run.app/api/questions');
     
     if (!response.ok) {
       console.error(`Error fetching questions: ${response.status}`);
