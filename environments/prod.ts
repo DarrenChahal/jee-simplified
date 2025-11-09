@@ -19,5 +19,4 @@ export const apiUrls = {
     updateProfile: `${BASE_API_URL}/users/update`,
     registerForTest: `${BASE_API_URL}/users/test-registration/`,
   },
-
 };
