@@ -418,3 +418,9 @@
     stroke-dashoffset: 50;
   }
 }
+
+.katex-display {
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
