@@ -6,6 +6,7 @@ import { Clock, ChevronLeft, ChevronRight, CheckCircle, HelpCircle, Calendar, Se
 import { Button } from "@/components/ui/button"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
+import { apiUrls } from '@/environments/prod';
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
@@ -17,7 +18,10 @@ import { useTemplates } from "./templates-provider"
 import { Template } from "./hooks/getTemplates"
 import { toast } from "@/components/ui/use-toast"
 
+import { useUser } from "@clerk/nextjs"
+
 export default function MockTestPage() {
+  const { user } = useUser()
   const router = useRouter()
   const { templates, isLoading: isLoadingTemplates, deleteTemplate } = useTemplates()
   const [currentQuestion, setCurrentQuestion] = useState(0)
@@ -45,7 +49,7 @@ export default function MockTestPage() {
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false)
   const [testToDelete, setTestToDelete] = useState<string | null>(null)
-  
+
   // Add state for admin tests
   const [adminTests, setAdminTests] = useState<{
     id: string;
@@ -60,7 +64,7 @@ export default function MockTestPage() {
     difficulty: string;
   }[]>([])
   const [isLoadingAdminTests, setIsLoadingAdminTests] = useState(false)
-  
+
   // Mock user role for demonstration - this would normally come from an auth system
   const [userRole] = useState("admin") // For testing purposes, set to "admin"
 
@@ -77,8 +81,10 @@ export default function MockTestPage() {
     date: string;
     time: string;
     registrations: number;
+    isRegistered?: boolean;
   }[]>([])
   const [isLoadingUpcomingTests, setIsLoadingUpcomingTests] = useState(false)
+  const [registeredTestIds, setRegisteredTestIds] = useState<Set<string>>(new Set())
 
   // Define API test data interface
   interface APITest {
@@ -95,8 +101,9 @@ export default function MockTestPage() {
     registrations?: number;
     registered_count: number;
     status: string;
+    is_registered?: boolean;
   }
-  
+
   interface Template {
     _id: string;
     name: string;
@@ -321,44 +328,152 @@ export default function MockTestPage() {
   };
 
   const handleTestRegistration = async (test: {
-  id?: string;
-  title: string;
-  description: string;
-  subject: string;
-  subjects?: string[];
-  questions: number;
-  duration: number;
-  difficulty: string;
-  date: string;
-  time: string;
-  registrations?: number;
-}) => {
-  try {
-    const bodyData = {
-      user_email: "",
-      test_id: test.id,
-    }
-    const response = await fetch('/api/users', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(bodyData),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed with status: ${response.status}`);
+    id?: string;
+    title: string;
+    description: string;
+    subject: string;
+    subjects?: string[];
+    questions: number;
+    duration: number;
+    difficulty: string;
+    date: string;
+    time: string;
+    registrations?: number;
+  }) => {
+    if (!user || !user.primaryEmailAddress?.emailAddress) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to register for tests",
+        variant: "destructive"
+      });
+      return;
     }
 
-    const data = await response.json();
-    console.log('User registered for test:', data);
+    if (!test.id) {
+      toast({
+        title: "Error",
+        description: "Test ID is missing",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    // You can show success message or redirect here
-  } catch (error) {
-    console.error('Registration failed:', error);
-    // Show error to the user
-  }
-};
+    try {
+      const bodyData = {
+        user_email: user.primaryEmailAddress.emailAddress,
+        test_id: test.id,
+      }
+
+      const response = await fetch(apiUrls.users.registerForTest, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bodyData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || `Failed with status: ${response.status}`);
+      }
+
+      console.log('User registered for test:', data);
+
+      toast({
+        title: "Registration Successful",
+        description: `You have successfully registered for ${test.title}`,
+      });
+
+      // Update local state
+      if (test.id) {
+        setRegisteredTestIds(prev => {
+          const next = new Set(prev);
+          next.add(test.id!);
+          return next;
+        });
+      }
+
+      setUpcomingTests(prev => prev.map(t =>
+        t.id === test.id
+          ? { ...t, registrations: (t.registrations || 0) + 1 }
+          : t
+      ));
+
+    } catch (error) {
+      console.error('Registration failed:', error);
+      toast({
+        title: "Registration Failed",
+        description: error instanceof Error ? error.message : "Failed to register for the test",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleTestUnregistration = async (test: {
+    id?: string;
+    title: string;
+  }) => {
+    if (!user || !user.primaryEmailAddress?.emailAddress) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to unregister from tests",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!test.id) return;
+
+    try {
+      const bodyData = {
+        user_email: user.primaryEmailAddress.emailAddress,
+        test_id: test.id,
+      }
+
+      const response = await fetch(apiUrls.users.unregisterForTest, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bodyData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || `Failed with status: ${response.status}`);
+      }
+
+      toast({
+        title: "Unregistration Successful",
+        description: `You have successfully unregistered from ${test.title}`,
+      });
+
+      // Update local state
+      if (test.id) {
+        setRegisteredTestIds(prev => {
+          const next = new Set(prev);
+          next.delete(test.id!);
+          return next;
+        });
+      }
+
+      setUpcomingTests(prev => prev.map(t =>
+        t.id === test.id
+          ? { ...t, registrations: Math.max(0, (t.registrations || 0) - 1) }
+          : t
+      ));
+
+    } catch (error) {
+      console.error('Unregistration failed:', error);
+      toast({
+        title: "Unregistration Failed",
+        description: error instanceof Error ? error.message : "Failed to unregister from the test",
+        variant: "destructive"
+      });
+    }
+  };
 
 
   // Format time remaining as MM:SS
@@ -383,9 +498,9 @@ export default function MockTestPage() {
     // Add the missing subject property
     const enrichedTest = {
       ...test,
-      subject: test.description.includes("physics") ? "Physics" : 
-               test.description.includes("chemistry") ? "Chemistry" : 
-               test.description.includes("mathematics") ? "Mathematics" : "Combined",
+      subject: test.description.includes("physics") ? "Physics" :
+        test.description.includes("chemistry") ? "Chemistry" :
+          test.description.includes("mathematics") ? "Mathematics" : "Combined",
       registrations: test.participants
     };
     handleStartTest(enrichedTest);
@@ -420,7 +535,7 @@ export default function MockTestPage() {
       duration: template.duration,
       difficulty: template.difficulty
     }
-    
+
     router.push(`/mock-test/create?template=${encodeURIComponent(JSON.stringify(formattedTemplate))}`)
   }
 
@@ -433,7 +548,7 @@ export default function MockTestPage() {
   // Handle deleting a template
   const handleDeleteTemplate = async (e: React.MouseEvent, templateId: string) => {
     e.stopPropagation() // Prevent the card click event from firing
-    
+
     if (confirm("Are you sure you want to delete this template?")) {
       setIsDeleting(templateId)
       try {
@@ -464,9 +579,9 @@ export default function MockTestPage() {
   const fetchAdminTests = async () => {
     setIsLoadingAdminTests(true)
     try {
-      const response = await fetch('https://jee-simplified-api-274150960347.us-central1.run.app/api/tests')
+      const response = await fetch(apiUrls.tests.getAll)
       const data = await response.json()
-      
+
       if (data.success) {
         // Map API response to our required format
         const formattedTests = data.data.documents.map((test: {
@@ -482,8 +597,8 @@ export default function MockTestPage() {
           // Convert timestamp to readable date and time
           const testDate = new Date(test.test_date)
           const formattedDate = testDate.toLocaleDateString('en-US', {
-            month: 'short', 
-            day: 'numeric', 
+            month: 'short',
+            day: 'numeric',
             year: 'numeric'
           })
           const formattedTime = testDate.toLocaleTimeString('en-US', {
@@ -491,7 +606,7 @@ export default function MockTestPage() {
             minute: '2-digit',
             hour12: true
           })
-          
+
           return {
             id: test._id,
             title: test.title,
@@ -505,7 +620,7 @@ export default function MockTestPage() {
             difficulty: test.difficulty || "Medium"
           }
         })
-        
+
         setAdminTests(formattedTests)
       } else {
         console.error('Failed to fetch tests:', data.message)
@@ -538,23 +653,23 @@ export default function MockTestPage() {
     setTestToDelete(testId)
     setShowDeleteConfirmDialog(true)
   }
-  
+
   // Function to confirm test deletion
   const confirmDeleteTest = async () => {
     if (!testToDelete) return
-    
+
     setIsDeleting(testToDelete)
     try {
-      const response = await fetch(`https://jee-simplified-api-274150960347.us-central1.run.app/api/tests/${testToDelete}`, {
+      const response = await fetch(apiUrls.tests.delete(testToDelete), {
         method: 'DELETE'
       })
-      
+
       const data = await response.json()
-      
+
       if (data.success) {
         // Remove the deleted test from state
         setAdminTests(adminTests.filter(test => test.id !== testToDelete))
-        
+
         // Show success toast
         toast({
           title: "Test deleted",
@@ -586,22 +701,22 @@ export default function MockTestPage() {
   const fetchUpcomingTests = async () => {
     setIsLoadingUpcomingTests(true)
     try {
-      const response = await fetch('https://jee-simplified-api-274150960347.us-central1.run.app/api/tests?status=scheduled')
-      
+      const response = await fetch(`${apiUrls.tests.getAll}?status=scheduled`)
+
       if (!response.ok) {
         console.error('Failed to fetch upcoming tests:', response.status)
         return
       }
-      
+
       const data = await response.json()
-      
+
       if (data.success && data.data && data.data.documents) {
         const formattedTests = data.data.documents.map((test: APITest) => {
           // Convert timestamp to readable date and time
           const testDate = new Date(test.test_date)
           const formattedDate = testDate.toLocaleDateString('en-US', {
-            month: 'short', 
-            day: 'numeric', 
+            month: 'short',
+            day: 'numeric',
             year: 'numeric'
           })
           const formattedTime = testDate.toLocaleTimeString('en-US', {
@@ -609,7 +724,7 @@ export default function MockTestPage() {
             minute: '2-digit',
             hour12: true
           })
-          
+
           return {
             id: test._id,
             title: test.title,
@@ -624,7 +739,7 @@ export default function MockTestPage() {
             registrations: test.registered_count
           }
         })
-        
+
         setUpcomingTests(formattedTests)
       }
     } catch (error) {
@@ -633,6 +748,35 @@ export default function MockTestPage() {
       setIsLoadingUpcomingTests(false)
     }
   }
+
+  // Fetch registered tests for the user
+  const fetchRegisteredTests = async () => {
+    if (!user || !user.primaryEmailAddress?.emailAddress) return;
+
+    try {
+      console.log("Fetching registered tests for:", user.primaryEmailAddress.emailAddress);
+      const response = await fetch(apiUrls.users.getRegisteredTests(user.primaryEmailAddress.emailAddress));
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      console.log("Registered tests response:", data);
+
+      if (data.success && data.data) {
+        const ids = new Set<string>(data.data.map((reg: any) => reg.test_id || reg._id));
+        setRegisteredTestIds(ids);
+      }
+    } catch (error) {
+      console.error('Error fetching registered tests:', error);
+    }
+  }
+
+  // Fetch registered tests when user loads
+  useEffect(() => {
+    if (user) {
+      fetchRegisteredTests();
+    }
+  }, [user]);
 
   // Fetch upcoming tests when component mounts and when tab changes to upcoming-tests
   useEffect(() => {
@@ -683,13 +827,12 @@ export default function MockTestPage() {
                   <button
                     key={index}
                     onClick={() => handleJumpToQuestion(index)}
-                    className={`flex items-center justify-center h-10 w-10 rounded-md text-sm font-medium transition-colors ${
-                      getQuestionStatus(index) === "current"
-                        ? "bg-primary text-primary-foreground"
-                        : getQuestionStatus(index) === "answered"
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                          : "bg-muted hover:bg-muted/80"
-                    }`}
+                    className={`flex items-center justify-center h-10 w-10 rounded-md text-sm font-medium transition-colors ${getQuestionStatus(index) === "current"
+                      ? "bg-primary text-primary-foreground"
+                      : getQuestionStatus(index) === "answered"
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-muted hover:bg-muted/80"
+                      }`}
                   >
                     {index + 1}
                   </button>
@@ -792,7 +935,7 @@ export default function MockTestPage() {
               Select a pre-defined template or create a new test from scratch
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             {isLoadingTemplates ? (
               <div className="col-span-2 py-8 flex justify-center items-center">
@@ -805,8 +948,8 @@ export default function MockTestPage() {
             ) : (
               <>
                 {templates.map((template) => (
-                  <Card 
-                    key={template._id} 
+                  <Card
+                    key={template._id}
                     className="takeuforward-card p-4 cursor-pointer hover:border-primary/50 transition-all"
                     onClick={(e) => {
                       e.stopPropagation()
@@ -817,10 +960,10 @@ export default function MockTestPage() {
                     <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
                     <div className="flex flex-wrap gap-2 mt-2">
                       <div className="flex flex-wrap gap-1">
-                        {Array.isArray(template.subject) 
+                        {Array.isArray(template.subject)
                           ? template.subject.map((subj: string, idx: number) => (
-                              <Badge key={idx} variant="outline" className="text-xs">{subj}</Badge>
-                            ))
+                            <Badge key={idx} variant="outline" className="text-xs">{subj}</Badge>
+                          ))
                           : <Badge variant="outline" className="text-xs">{template.subject}</Badge>
                         }
                       </div>
@@ -833,10 +976,10 @@ export default function MockTestPage() {
                     </div>
                     {userRole === "admin" && (
                       <div className="mt-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="text-xs text-red-500 hover:text-red-600" 
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs text-red-500 hover:text-red-600"
                           onClick={(e) => {
                             e.stopPropagation()
                             handleDeleteTemplate(e, template._id)
@@ -859,8 +1002,8 @@ export default function MockTestPage() {
                 ))}
               </>
             )}
-            
-            <Card 
+
+            <Card
               className="takeuforward-card p-4 cursor-pointer border-dashed border-muted-foreground/30 hover:border-primary/50 transition-all"
               onClick={handleCreateCustomTest}
             >
@@ -884,15 +1027,15 @@ export default function MockTestPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 pt-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowDeleteConfirmDialog(false)}
               className="border-gray-300 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:hover:bg-gray-800"
             >
               Cancel
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={confirmDeleteTest}
               disabled={isDeleting !== null}
               className="bg-red-500 hover:bg-red-600 text-white shadow-sm hover:shadow-md transition-all duration-200"
@@ -912,16 +1055,16 @@ export default function MockTestPage() {
             <TabsTrigger value="admin-tests">Manage Tests</TabsTrigger>
           )}
         </TabsList>
-        
+
         {/* Admin Tab for Managing Tests - Only visible to admin users */}
         {userRole === "admin" && (
           <TabsContent value="admin-tests" className="space-y-6">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-4">
                 <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-blue-600">Manage Mock Tests</h2>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={fetchAdminTests}
                   disabled={isLoadingAdminTests}
                   className="border-gray-300 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-50 transition-all"
@@ -930,14 +1073,14 @@ export default function MockTestPage() {
                   Refresh
                 </Button>
               </div>
-              <Button 
-                onClick={() => setShowTemplateDialog(true)} 
+              <Button
+                onClick={() => setShowTemplateDialog(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
               >
                 <Plus className="h-4 w-4 mr-2" /> Add New Test
               </Button>
             </div>
-            
+
             <div className="overflow-hidden rounded-lg border shadow-sm">
               {isLoadingAdminTests ? (
                 <div className="p-8 text-center">Loading tests...</div>
@@ -982,17 +1125,17 @@ export default function MockTestPage() {
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex gap-2">
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
-                                className="text-xs border-blue-200 hover:bg-blue-50 hover:border-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/30" 
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs border-blue-200 hover:bg-blue-50 hover:border-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/30"
                                 onClick={() => router.push(`/mock-test/edit/${test.id}`)}
                               >
                                 <Edit className="h-3 w-3 mr-1" /> Edit
                               </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 className="text-xs text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200 hover:border-red-300 dark:border-red-800/50 dark:hover:bg-red-900/30"
                                 onClick={() => handleDeleteTest(test.id)}
                               >
@@ -1024,7 +1167,7 @@ export default function MockTestPage() {
             </div>
           </TabsContent>
         )}
-        
+
         {/* Upcoming Mock Tests Tab */}
         <TabsContent value="upcoming-tests" className="space-y-6">
           {isLoadingUpcomingTests ? (
@@ -1048,8 +1191,8 @@ export default function MockTestPage() {
                       </div>
                       <Badge variant="outline" className={
                         test.difficulty === "Hard" ? "border-red-500 text-red-500" :
-                        test.difficulty === "Medium" ? "border-amber-500 text-amber-500" :
-                        "border-green-500 text-green-500"
+                          test.difficulty === "Medium" ? "border-amber-500 text-amber-500" :
+                            "border-green-500 text-green-500"
                       }>
                         {test.difficulty}
                       </Badge>
@@ -1080,9 +1223,26 @@ export default function MockTestPage() {
                       <div className="text-xs text-muted-foreground">
                         <span className="font-medium text-primary">{test.registrations}</span> registrations
                       </div>
-                      <Button className="takeuforward-button" onClick={() => handleStartTest(test)}>
-                        Register
-                      </Button>
+                      <div className="flex gap-2">
+                        {registeredTestIds.has(test.id) ? (
+                          <>
+                            <Button className="takeuforward-button bg-green-600 hover:bg-green-700" disabled>
+                              Registered
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 dark:border-red-800 dark:hover:bg-red-900/30"
+                              onClick={() => handleTestUnregistration(test)}
+                            >
+                              Unregister
+                            </Button>
+                          </>
+                        ) : (
+                          <Button className="takeuforward-button" onClick={() => handleTestRegistration(test)}>
+                            Register
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </Card>
@@ -1090,7 +1250,7 @@ export default function MockTestPage() {
             </div>
           )}
         </TabsContent>
-        
+
         {/* Past Mock Tests Tab */}
         <TabsContent value="past-tests" className="space-y-6">
           <div className="overflow-hidden rounded-lg border">
@@ -1140,7 +1300,7 @@ export default function MockTestPage() {
             </table>
           </div>
         </TabsContent>
-        
+
         {/* My Mock Tests Tab */}
         <TabsContent value="my-tests" className="space-y-6">
           <div className="overflow-hidden rounded-lg border">

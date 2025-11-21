@@ -1,23 +1,24 @@
 import { NextResponse } from 'next/server';
 
-const API_URL = 'https://jee-simplified-api-274150960347.us-central1.run.app/api/templates';
+import { apiUrls } from '@/environments/prod';
+const API_URL = apiUrls.templates.getAll;
 
 export async function GET() {
   try {
-    const response = await fetch(API_URL, { 
+    const response = await fetch(API_URL, {
       cache: 'no-store'
     });
-    
+
     if (!response.ok) {
       throw new Error(`API returned status: ${response.status}`);
     }
-    
+
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error fetching templates:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch templates' }, 
+      { success: false, error: 'Failed to fetch templates' },
       { status: 500 }
     );
   }
@@ -26,7 +27,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    
+
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
@@ -34,13 +35,13 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify(body),
     });
-    
+
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error creating template:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to create template' }, 
+      { success: false, error: 'Failed to create template' },
       { status: 500 }
     );
   }
@@ -52,28 +53,28 @@ export async function DELETE(request: Request) {
     const url = new URL(request.url);
     // Extract the ID from the search params
     const id = url.searchParams.get('id');
-    
+
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'Template ID is required' }, 
+        { success: false, error: 'Template ID is required' },
         { status: 400 }
       );
     }
-    
+
     const response = await fetch(`${API_URL}/${id}`, {
       method: 'DELETE',
     });
-    
+
     if (!response.ok) {
       throw new Error(`API returned status: ${response.status}`);
     }
-    
+
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error deleting template:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to delete template' }, 
+      { success: false, error: 'Failed to delete template' },
       { status: 500 }
     );
   }
