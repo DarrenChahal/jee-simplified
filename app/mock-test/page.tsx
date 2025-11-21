@@ -18,7 +18,10 @@ import { useTemplates } from "./templates-provider"
 import { Template } from "./hooks/getTemplates"
 import { toast } from "@/components/ui/use-toast"
 
+import { useUser } from "@clerk/nextjs"
+
 export default function MockTestPage() {
+  const { user } = useUser()
   const router = useRouter()
   const { templates, isLoading: isLoadingTemplates, deleteTemplate } = useTemplates()
   const [currentQuestion, setCurrentQuestion] = useState(0)
@@ -78,8 +81,10 @@ export default function MockTestPage() {
     date: string;
     time: string;
     registrations: number;
+    isRegistered?: boolean;
   }[]>([])
   const [isLoadingUpcomingTests, setIsLoadingUpcomingTests] = useState(false)
+  const [registeredTestIds, setRegisteredTestIds] = useState<Set<string>>(new Set())
 
   // Define API test data interface
   interface APITest {
@@ -96,6 +101,7 @@ export default function MockTestPage() {
     registrations?: number;
     registered_count: number;
     status: string;
+    is_registered?: boolean;
   }
 
   interface Template {
@@ -334,12 +340,31 @@ export default function MockTestPage() {
     time: string;
     registrations?: number;
   }) => {
+    if (!user || !user.primaryEmailAddress?.emailAddress) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to register for tests",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!test.id) {
+      toast({
+        title: "Error",
+        description: "Test ID is missing",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const bodyData = {
-        user_email: "",
+        user_email: user.primaryEmailAddress.emailAddress,
         test_id: test.id,
       }
-      const response = await fetch('/api/users', {
+
+      const response = await fetch(apiUrls.users.registerForTest, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -347,17 +372,106 @@ export default function MockTestPage() {
         body: JSON.stringify(bodyData),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error(`Failed with status: ${response.status}`);
+        throw new Error(data.message || `Failed with status: ${response.status}`);
       }
 
-      const data = await response.json();
       console.log('User registered for test:', data);
 
-      // You can show success message or redirect here
+      toast({
+        title: "Registration Successful",
+        description: `You have successfully registered for ${test.title}`,
+      });
+
+      // Update local state
+      if (test.id) {
+        setRegisteredTestIds(prev => {
+          const next = new Set(prev);
+          next.add(test.id!);
+          return next;
+        });
+      }
+
+      setUpcomingTests(prev => prev.map(t =>
+        t.id === test.id
+          ? { ...t, registrations: (t.registrations || 0) + 1 }
+          : t
+      ));
+
     } catch (error) {
       console.error('Registration failed:', error);
-      // Show error to the user
+      toast({
+        title: "Registration Failed",
+        description: error instanceof Error ? error.message : "Failed to register for the test",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleTestUnregistration = async (test: {
+    id?: string;
+    title: string;
+  }) => {
+    if (!user || !user.primaryEmailAddress?.emailAddress) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to unregister from tests",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!test.id) return;
+
+    try {
+      const bodyData = {
+        user_email: user.primaryEmailAddress.emailAddress,
+        test_id: test.id,
+      }
+
+      const response = await fetch(apiUrls.users.unregisterForTest, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bodyData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || `Failed with status: ${response.status}`);
+      }
+
+      toast({
+        title: "Unregistration Successful",
+        description: `You have successfully unregistered from ${test.title}`,
+      });
+
+      // Update local state
+      if (test.id) {
+        setRegisteredTestIds(prev => {
+          const next = new Set(prev);
+          next.delete(test.id!);
+          return next;
+        });
+      }
+
+      setUpcomingTests(prev => prev.map(t =>
+        t.id === test.id
+          ? { ...t, registrations: Math.max(0, (t.registrations || 0) - 1) }
+          : t
+      ));
+
+    } catch (error) {
+      console.error('Unregistration failed:', error);
+      toast({
+        title: "Unregistration Failed",
+        description: error instanceof Error ? error.message : "Failed to unregister from the test",
+        variant: "destructive"
+      });
     }
   };
 
@@ -634,6 +748,35 @@ export default function MockTestPage() {
       setIsLoadingUpcomingTests(false)
     }
   }
+
+  // Fetch registered tests for the user
+  const fetchRegisteredTests = async () => {
+    if (!user || !user.primaryEmailAddress?.emailAddress) return;
+
+    try {
+      console.log("Fetching registered tests for:", user.primaryEmailAddress.emailAddress);
+      const response = await fetch(apiUrls.users.getRegisteredTests(user.primaryEmailAddress.emailAddress));
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      console.log("Registered tests response:", data);
+
+      if (data.success && data.data) {
+        const ids = new Set<string>(data.data.map((reg: any) => reg.test_id || reg._id));
+        setRegisteredTestIds(ids);
+      }
+    } catch (error) {
+      console.error('Error fetching registered tests:', error);
+    }
+  }
+
+  // Fetch registered tests when user loads
+  useEffect(() => {
+    if (user) {
+      fetchRegisteredTests();
+    }
+  }, [user]);
 
   // Fetch upcoming tests when component mounts and when tab changes to upcoming-tests
   useEffect(() => {
@@ -1080,9 +1223,26 @@ export default function MockTestPage() {
                       <div className="text-xs text-muted-foreground">
                         <span className="font-medium text-primary">{test.registrations}</span> registrations
                       </div>
-                      <Button className="takeuforward-button" onClick={() => handleStartTest(test)}>
-                        Register
-                      </Button>
+                      <div className="flex gap-2">
+                        {registeredTestIds.has(test.id) ? (
+                          <>
+                            <Button className="takeuforward-button bg-green-600 hover:bg-green-700" disabled>
+                              Registered
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 dark:border-red-800 dark:hover:bg-red-900/30"
+                              onClick={() => handleTestUnregistration(test)}
+                            >
+                              Unregister
+                            </Button>
+                          </>
+                        ) : (
+                          <Button className="takeuforward-button" onClick={() => handleTestRegistration(test)}>
+                            Register
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </Card>
