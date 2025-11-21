@@ -6,7 +6,7 @@ export const apiUrls = {
     create: `${BASE_API_URL}/tests/create`,
     getById: (id: string) => `${BASE_API_URL}/tests/${id}`,
     register: (id: string) => `${BASE_API_URL}/tests/${id}/register`,
-
+    delete: (id: string) => `${BASE_API_URL}/tests/${id}`,
   },
   auth: {
     login: `${BASE_API_URL}/auth/login`,
@@ -18,5 +18,11 @@ export const apiUrls = {
     profile: `${BASE_API_URL}/users/profile`,
     updateProfile: `${BASE_API_URL}/users/update`,
     registerForTest: `${BASE_API_URL}/users/test-registration/`,
+  },
+  templates: {
+    getAll: `${BASE_API_URL}/templates`,
+  },
+  questions: {
+    getAll: `${BASE_API_URL}/questions`,
   },
 };

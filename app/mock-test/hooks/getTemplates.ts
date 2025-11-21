@@ -1,6 +1,7 @@
 'use server';
 
 import { cache } from 'react';
+import { apiUrls } from '@/environments/prod';
 
 // Define Template interface so it can be shared
 export interface Template {
@@ -19,19 +20,19 @@ export interface Template {
 export const getTemplates = cache(async (): Promise<Template[]> => {
   try {
     // Use relative URL for server-side fetch
-    const response = await fetch('https://jee-simplified-api-274150960347.us-central1.run.app/api/templates');
-    
+    const response = await fetch(apiUrls.templates.getAll);
+
     if (!response.ok) {
       console.error(`Error fetching templates: ${response.status}`);
       return [];
     }
-    
+
     const data = await response.json();
-    
+
     if (data.success && Array.isArray(data.templates)) {
       return data.templates;
     }
-    
+
     return [];
   } catch (error) {
     console.error('Error fetching templates:', error);

@@ -1,6 +1,7 @@
 'use server';
 
 import { cache } from 'react';
+import { apiUrls } from '@/environments/prod';
 
 // Define Question interface
 export interface Question {
@@ -26,19 +27,19 @@ export interface Question {
 export const getQuestions = cache(async (): Promise<Question[]> => {
   try {
     // Use relative URL for server-side fetch
-    const response = await fetch('https://jee-simplified-api-274150960347.us-central1.run.app/api/questions');
-    
+    const response = await fetch(apiUrls.questions.getAll);
+
     if (!response.ok) {
       console.error(`Error fetching questions: ${response.status}`);
       return [];
     }
-    
+
     const data = await response.json();
-    
+
     if (data.success && Array.isArray(data.questions)) {
       return data.questions;
     }
-    
+
     return [];
   } catch (error) {
     console.error('Error fetching questions:', error);

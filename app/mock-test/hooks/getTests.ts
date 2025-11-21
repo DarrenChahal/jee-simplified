@@ -1,6 +1,7 @@
 'use server';
 
 import { cache } from 'react';
+import { apiUrls } from '@/environments/prod';
 
 // Define Test interface
 export interface Test {
@@ -23,19 +24,19 @@ export interface Test {
 export const getTests = cache(async (): Promise<Test[]> => {
   try {
     // Use relative URL for server-side fetch
-    const response = await fetch('https://jee-simplified-api-274150960347.us-central1.run.app/api/tests');
-    
+    const response = await fetch(apiUrls.tests.getAll);
+
     if (!response.ok) {
       console.error(`Error fetching tests: ${response.status}`);
       return [];
     }
-    
+
     const data = await response.json();
-    
+
     if (data.success && Array.isArray(data.tests)) {
       return data.tests;
     }
-    
+
     return [];
   } catch (error) {
     console.error('Error fetching tests:', error);
