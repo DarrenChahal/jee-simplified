@@ -1,5 +1,5 @@
-const BASE_API_URL = "https://jee-simplified-api-274150960347.us-central1.run.app/api";
-//const BASE_API_URL = "http://localhost:8080/api";
+//const BASE_API_URL = "https://jee-simplified-api-274150960347.us-central1.run.app/api";
+const BASE_API_URL = "http://localhost:8080/api";
 
 export const apiUrls = {
   tests: {
@@ -27,5 +27,8 @@ export const apiUrls = {
   },
   questions: {
     getAll: `${BASE_API_URL}/questions`,
+  },
+  system: {
+    time: `${BASE_API_URL}/system/time`,
   },
 };
