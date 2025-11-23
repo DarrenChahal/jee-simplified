@@ -27,6 +27,7 @@ export const apiUrls = {
   },
   questions: {
     getAll: `${BASE_API_URL}/questions`,
+
   },
   system: {
     time: `${BASE_API_URL}/system/time`,

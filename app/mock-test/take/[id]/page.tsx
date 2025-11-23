@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Card } from "@/components/ui/card"
 import { toast } from "@/components/ui/use-toast"
 import { apiUrls } from '@/environments/prod'
+import { BlockMath } from 'react-katex'
+import 'katex/dist/katex.min.css'
 
 export default function TakeTestPage() {
     const router = useRouter()
@@ -16,78 +18,84 @@ export default function TakeTestPage() {
     const testId = params?.id as string
 
     const [currentQuestion, setCurrentQuestion] = useState(0)
-    const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({})
+    const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({})
     const [timeRemaining, setTimeRemaining] = useState(5400) // 90 minutes in seconds
     const [isTestSubmitted, setIsTestSubmitted] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
     const [testDetails, setTestDetails] = useState<any>(null)
+    const [questions, setQuestions] = useState<any[]>([])
+    const [subjects, setSubjects] = useState<string[]>([])
+    const [currentSubject, setCurrentSubject] = useState<string>("")
+    const [subjectQuestions, setSubjectQuestions] = useState<Record<string, any[]>>({})
 
-    // Mock test questions (fallback/default)
-    const mockTest = {
-        title: "JEE Advanced Physics Mock Test",
-        totalQuestions: 25,
-        timeLimit: 90, // minutes
-        questions: [
-            {
-                id: 1,
-                text: "A particle moves along the x-axis from x = 0 to x = a under the influence of a force F(x) = kx, where k is a positive constant. The work done by the force is:",
-                options: [
-                    { id: "a", text: "ka²/2" },
-                    { id: "b", text: "ka" },
-                    { id: "c", text: "-ka²/2" },
-                    { id: "d", text: "0" },
-                ],
-                correctAnswer: "a",
-            },
-            {
-                id: 2,
-                text: "The value of the integral ∫(0 to π/2) sin²x cos²x dx is:",
-                options: [
-                    { id: "a", text: "π/8" },
-                    { id: "b", text: "π/16" },
-                    { id: "c", text: "π/4" },
-                    { id: "d", text: "π/32" },
-                ],
-                correctAnswer: "b",
-            },
-            {
-                id: 3,
-                text: "The hybridization of carbon atoms in benzene is:",
-                options: [
-                    { id: "a", text: "sp" },
-                    { id: "b", text: "sp²" },
-                    { id: "c", text: "sp³" },
-                    { id: "d", text: "dsp²" },
-                ],
-                correctAnswer: "b",
-            },
-            // More questions would be added here
-        ],
-    }
-
-    // Fetch test details
+    // Fetch test details and questions
     useEffect(() => {
-        const fetchTestDetails = async () => {
+        const fetchTestDetailsAndQuestions = async () => {
             if (!testId) return
 
             try {
-                const response = await fetch(apiUrls.tests.getById(testId))
-                if (response.ok) {
-                    const data = await response.json()
+                // Fetch test details
+                const testResponse = await fetch(apiUrls.tests.getById(testId))
+                if (testResponse.ok) {
+                    const data = await testResponse.json()
                     if (data.success) {
                         setTestDetails(data.data)
-                        // If the API returned questions, we would use them here
-                        // For now, we'll use the mock questions but update title/duration if available
                         if (data.data.duration) {
                             setTimeRemaining(data.data.duration * 60)
                         }
                     }
                 }
+
+                // Fetch questions
+                const questionsResponse = await fetch(`${apiUrls.questions.getAll}?test_id=${testId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+
+                if (questionsResponse.ok) {
+                    const data = await questionsResponse.json()
+
+                    let fetchedQuestions: any[] = []
+                    if (data.success) {
+                        if (Array.isArray(data.questions)) {
+                            fetchedQuestions = data.questions
+                        } else if (data.data && Array.isArray(data.data.documents)) {
+                            fetchedQuestions = data.data.documents
+                        } else if (Array.isArray(data.data)) {
+                            fetchedQuestions = data.data
+                        }
+                    }
+
+                    if (fetchedQuestions.length > 0) {
+                        setQuestions(fetchedQuestions)
+
+                        // Segregate questions by subject
+                        const segregated: Record<string, any[]> = {}
+                        const subjectList: string[] = []
+
+                        fetchedQuestions.forEach((q: any) => {
+                            const subject = q.subjects && q.subjects.length > 0 ? q.subjects[0] : 'General'
+                            if (!segregated[subject]) {
+                                segregated[subject] = []
+                                subjectList.push(subject)
+                            }
+                            segregated[subject].push(q)
+                        })
+
+                        setSubjectQuestions(segregated)
+                        setSubjects(subjectList)
+                        if (subjectList.length > 0) {
+                            setCurrentSubject(subjectList[0])
+                        }
+                    }
+                }
             } catch (error) {
-                console.error("Failed to fetch test details", error)
+                console.error("Failed to fetch test data", error)
                 toast({
                     title: "Error",
-                    description: "Failed to load test details",
+                    description: "Failed to load test data",
                     variant: "destructive"
                 })
             } finally {
@@ -95,7 +103,7 @@ export default function TakeTestPage() {
             }
         }
 
-        fetchTestDetails()
+        fetchTestDetailsAndQuestions()
     }, [testId])
 
     // Timer effect
@@ -111,14 +119,24 @@ export default function TakeTestPage() {
     }, [timeRemaining, isTestSubmitted, isLoading]);
 
     const handleAnswerSelect = (value: string) => {
-        setSelectedAnswers({
-            ...selectedAnswers,
-            [currentQuestion]: value,
-        });
+        const currentQ = getCurrentQuestion()
+        if (currentQ) {
+            setSelectedAnswers({
+                ...selectedAnswers,
+                [currentQ._id]: value,
+            });
+        }
     };
 
+    const getCurrentQuestion = () => {
+        if (currentSubject && subjectQuestions[currentSubject]) {
+            return subjectQuestions[currentSubject][currentQuestion]
+        }
+        return null
+    }
+
     const handleNextQuestion = () => {
-        if (currentQuestion < mockTest.questions.length - 1) {
+        if (currentSubject && subjectQuestions[currentSubject] && currentQuestion < subjectQuestions[currentSubject].length - 1) {
             setCurrentQuestion(currentQuestion + 1);
         }
     };
@@ -132,6 +150,11 @@ export default function TakeTestPage() {
     const handleJumpToQuestion = (index: number) => {
         setCurrentQuestion(index);
     };
+
+    const handleSubjectChange = (subject: string) => {
+        setCurrentSubject(subject)
+        setCurrentQuestion(0)
+    }
 
     const handleSubmitTest = () => {
         setIsTestSubmitted(true);
@@ -161,14 +184,14 @@ export default function TakeTestPage() {
     };
 
     // Get question status for the navigator
-    const getQuestionStatus = (index: number) => {
+    const getQuestionStatus = (questionId: string, index: number) => {
         if (currentQuestion === index) return "current";
-        if (selectedAnswers[index] !== undefined) return "answered";
+        if (selectedAnswers[questionId] !== undefined) return "answered";
         return "not-visited";
     };
 
     // Calculate progress percentage
-    const progressPercentage = (Object.keys(selectedAnswers).length / mockTest.totalQuestions) * 100;
+    const progressPercentage = questions.length > 0 ? (Object.keys(selectedAnswers).length / questions.length) * 100 : 0;
 
     if (isLoading) {
         return (
@@ -178,6 +201,8 @@ export default function TakeTestPage() {
         )
     }
 
+    const currentQ = getCurrentQuestion()
+
     return (
         <div className="min-h-screen bg-background">
             <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -186,7 +211,7 @@ export default function TakeTestPage() {
                         <Button variant="ghost" size="sm" onClick={() => router.push('/mock-test')}>
                             <ChevronLeft className="h-4 w-4 mr-1" /> Exit Test
                         </Button>
-                        <span className="font-medium">{testDetails?.title || mockTest.title}</span>
+                        <span className="font-medium">{testDetails?.title || "Mock Test"}</span>
                     </div>
                     <div className={getTimerClass()}>
                         <Clock className="h-5 w-5 mr-2" />
@@ -199,7 +224,7 @@ export default function TakeTestPage() {
                 <div className="mb-6">
                     <div className="flex items-center justify-between mt-2">
                         <div className="text-sm text-muted-foreground">
-                            {Object.keys(selectedAnswers).length} of {mockTest.totalQuestions} questions answered
+                            {Object.keys(selectedAnswers).length} of {questions.length} questions answered
                         </div>
                         <div className="text-sm text-muted-foreground">
                             Time remaining: {Math.floor(timeRemaining / 60)} minutes
@@ -210,18 +235,32 @@ export default function TakeTestPage() {
                     </div>
                 </div>
 
+                {/* Subject Tabs */}
+                <div className="flex space-x-2 mb-6 overflow-x-auto pb-2">
+                    {subjects.map((subject) => (
+                        <Button
+                            key={subject}
+                            variant={currentSubject === subject ? "default" : "outline"}
+                            onClick={() => handleSubjectChange(subject)}
+                            className="whitespace-nowrap"
+                        >
+                            {subject}
+                        </Button>
+                    ))}
+                </div>
+
                 <div className="grid md:grid-cols-[300px_1fr] gap-6">
                     {/* Question Navigator */}
                     <Card className="p-4 h-fit">
-                        <h2 className="font-medium mb-4">Question Navigator</h2>
+                        <h2 className="font-medium mb-4">Question Navigator - {currentSubject}</h2>
                         <div className="grid grid-cols-5 gap-2 mb-6">
-                            {Array.from({ length: mockTest.totalQuestions }).map((_, index) => (
+                            {subjectQuestions[currentSubject]?.map((q, index) => (
                                 <button
-                                    key={index}
+                                    key={q._id}
                                     onClick={() => handleJumpToQuestion(index)}
-                                    className={`flex items-center justify-center h-10 w-10 rounded-md text-sm font-medium transition-colors ${getQuestionStatus(index) === "current"
+                                    className={`flex items-center justify-center h-10 w-10 rounded-md text-sm font-medium transition-colors ${getQuestionStatus(q._id, index) === "current"
                                         ? "bg-primary text-primary-foreground"
-                                        : getQuestionStatus(index) === "answered"
+                                        : getQuestionStatus(q._id, index) === "answered"
                                             ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                                             : "bg-muted hover:bg-muted/80"
                                         }`}
@@ -240,7 +279,7 @@ export default function TakeTestPage() {
                             <div className="flex items-center gap-2 text-sm">
                                 <div className="flex items-center gap-1">
                                     <HelpCircle className="h-4 w-4 text-primary" />
-                                    <span>{mockTest.totalQuestions - Object.keys(selectedAnswers).length} Unanswered</span>
+                                    <span>{questions.length - Object.keys(selectedAnswers).length} Unanswered</span>
                                 </div>
                             </div>
                         </div>
@@ -253,38 +292,46 @@ export default function TakeTestPage() {
 
                     {/* Question Content */}
                     <Card className="p-6">
-                        <div className="space-y-6">
-                            <div>
-                                <div className="text-sm text-muted-foreground mb-2">
-                                    Question {currentQuestion + 1} of {mockTest.totalQuestions}
-                                </div>
-                                <h3 className="text-xl font-medium">{mockTest.questions[currentQuestion].text}</h3>
-                            </div>
-
-                            <RadioGroup
-                                value={selectedAnswers[currentQuestion] || ""}
-                                onValueChange={handleAnswerSelect}
-                                className="space-y-4"
-                            >
-                                {mockTest.questions[currentQuestion].options.map((option) => (
-                                    <div key={option.id} className="flex items-center space-x-2 rounded-md border p-3 hover:bg-muted/50">
-                                        <RadioGroupItem value={option.id} id={`option-${option.id}`} />
-                                        <Label htmlFor={`option-${option.id}`} className="flex-1 cursor-pointer">
-                                            {option.text}
-                                        </Label>
+                        {currentQ ? (
+                            <div className="space-y-6">
+                                <div>
+                                    <div className="text-sm text-muted-foreground mb-2">
+                                        Question {currentQuestion + 1} of {subjectQuestions[currentSubject]?.length || 0}
                                     </div>
-                                ))}
-                            </RadioGroup>
+                                    <div className="text-xl font-medium">
+                                        <BlockMath math={currentQ.question_text} />
+                                    </div>
+                                </div>
 
-                            <div className="flex items-center justify-between pt-4 border-t">
-                                <Button variant="outline" onClick={handlePreviousQuestion} disabled={currentQuestion === 0}>
-                                    <ChevronLeft className="mr-2 h-4 w-4" /> Previous
-                                </Button>
-                                <Button onClick={handleNextQuestion} disabled={currentQuestion === mockTest.questions.length - 1}>
-                                    Next <ChevronRight className="ml-2 h-4 w-4" />
-                                </Button>
+                                <RadioGroup
+                                    value={selectedAnswers[currentQ._id] || ""}
+                                    onValueChange={handleAnswerSelect}
+                                    className="space-y-4"
+                                >
+                                    {currentQ.answer.options.map((option: string, idx: number) => (
+                                        <div key={idx} className="flex items-center space-x-2 rounded-md border p-3 hover:bg-muted/50">
+                                            <RadioGroupItem value={option} id={`option-${idx}`} />
+                                            <Label htmlFor={`option-${idx}`} className="flex-1 cursor-pointer">
+                                                <BlockMath math={option} />
+                                            </Label>
+                                        </div>
+                                    ))}
+                                </RadioGroup>
+
+                                <div className="flex items-center justify-between pt-4 border-t">
+                                    <Button variant="outline" onClick={handlePreviousQuestion} disabled={currentQuestion === 0}>
+                                        <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+                                    </Button>
+                                    <Button onClick={handleNextQuestion} disabled={currentQuestion === (subjectQuestions[currentSubject]?.length || 0) - 1}>
+                                        Next <ChevronRight className="ml-2 h-4 w-4" />
+                                    </Button>
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="text-center py-10">
+                                <p className="text-muted-foreground">No questions available for this subject.</p>
+                            </div>
+                        )}
                     </Card>
                 </div>
             </main>
