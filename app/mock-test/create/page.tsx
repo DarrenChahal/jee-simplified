@@ -69,6 +69,10 @@ function CreateTestContent() {
     text: string;
     options: { id: string; text: string }[];
     correctAnswer: string;
+    for_class?: string[];
+    subjects?: string[];
+    topics?: string[];
+    tags?: string[];
   }[]>([])
 
   // Current editing question
@@ -81,6 +85,10 @@ function CreateTestContent() {
       { id: "d", text: "" },
     ],
     correctAnswer: "a",
+    for_class: ["11"],
+    subjects: ["Physics"],
+    topics: [] as string[],
+    tags: [] as string[],
     isEditMode: false,
     editIndex: -1
   })
@@ -187,6 +195,16 @@ function CreateTestContent() {
       return;
     }
 
+    // Validate topics (Mandatory)
+    if (!currentQuestion.topics || currentQuestion.topics.length === 0) {
+      toast({
+        title: "Missing information",
+        description: "Please add at least one topic",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const correctOption = currentQuestion.options.find(opt => opt.id === currentQuestion.correctAnswer);
     if (!correctOption) {
       toast({
@@ -207,9 +225,9 @@ function CreateTestContent() {
 
     // Construct payload for backend
     const payload = {
-      subjects: subjects,
-      for_class: ["11", "12", "dropper"],
-      topics: ["Mechanics"],
+      subjects: currentQuestion.subjects,
+      for_class: currentQuestion.for_class,
+      topics: currentQuestion.topics,
       difficulty: testDetails.difficulty || "Medium",
       origin: {
         type: "mock",
@@ -222,7 +240,7 @@ function CreateTestContent() {
         options: currentQuestion.options.map(opt => opt.text),
         correct_answer: correctOptionIndex.toString() // Send index (0-3) instead of text
       },
-      tags: ["JEE", "Mechanics", "Friction"],
+      tags: currentQuestion.tags,
       status: "active",
       created_by: "test@jeesimplified.com"
     };
@@ -257,7 +275,11 @@ function CreateTestContent() {
     const questionData = {
       text: currentQuestion.text,
       options: [...currentQuestion.options],
-      correctAnswer: currentQuestion.correctAnswer
+      correctAnswer: currentQuestion.correctAnswer,
+      for_class: currentQuestion.for_class,
+      subjects: currentQuestion.subjects,
+      topics: currentQuestion.topics,
+      tags: currentQuestion.tags
     };
 
     if (currentQuestion.isEditMode && currentQuestion.editIndex >= 0) {
@@ -293,6 +315,10 @@ function CreateTestContent() {
         { id: "d", text: "" },
       ],
       correctAnswer: "a",
+      for_class: ["11"],
+      subjects: ["Physics"],
+      topics: [] as string[],
+      tags: [] as string[],
       isEditMode: false,
       editIndex: -1
     })
@@ -303,6 +329,10 @@ function CreateTestContent() {
     const question = questions[index]
     setCurrentQuestion({
       ...question,
+      for_class: question.for_class || ["11"],
+      subjects: question.subjects || ["Physics"],
+      topics: question.topics || [],
+      tags: question.tags || [],
       isEditMode: true,
       editIndex: index
     })
@@ -742,6 +772,136 @@ function CreateTestContent() {
                   >
                     {showPreview ? 'Hide Preview' : 'Show Preview'}
                   </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Class Selection */}
+                  <div className="space-y-2">
+                    <Label>Class</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {["11", "12", "dropper"].map((cls) => (
+                        <div key={cls} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`class-${cls}`}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            checked={currentQuestion.for_class?.includes(cls)}
+                            onChange={(e) => {
+                              const updatedClass = e.target.checked
+                                ? [...(currentQuestion.for_class || []), cls]
+                                : (currentQuestion.for_class || []).filter(c => c !== cls);
+                              setCurrentQuestion({ ...currentQuestion, for_class: updatedClass });
+                            }}
+                          />
+                          <Label htmlFor={`class-${cls}`} className="text-sm font-normal capitalize">{cls}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Subject Selection */}
+                  <div className="space-y-2">
+                    <Label>Subject</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {["Physics", "Chemistry", "Mathematics"].map((sub) => (
+                        <div key={sub} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`subject-${sub}`}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            checked={currentQuestion.subjects?.includes(sub)}
+                            onChange={(e) => {
+                              const updatedSubjects = e.target.checked
+                                ? [...(currentQuestion.subjects || []), sub]
+                                : (currentQuestion.subjects || []).filter(s => s !== sub);
+                              setCurrentQuestion({ ...currentQuestion, subjects: updatedSubjects });
+                            }}
+                          />
+                          <Label htmlFor={`subject-${sub}`} className="text-sm font-normal">{sub}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Topics Input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="question-topics">Topics (Press Enter to add)</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {currentQuestion.topics?.map((topic, i) => (
+                        <Badge key={i} variant="secondary" className="flex items-center gap-1">
+                          {topic}
+                          <button
+                            onClick={() => {
+                              const newTopics = [...currentQuestion.topics];
+                              newTopics.splice(i, 1);
+                              setCurrentQuestion({ ...currentQuestion, topics: newTopics });
+                            }}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <Input
+                      id="question-topics"
+                      placeholder="Add a topic..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = e.currentTarget.value.trim();
+                          if (val && !currentQuestion.topics?.includes(val)) {
+                            setCurrentQuestion({
+                              ...currentQuestion,
+                              topics: [...(currentQuestion.topics || []), val]
+                            });
+                            e.currentTarget.value = '';
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {/* Tags Input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="question-tags">Tags (Press Enter to add)</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {currentQuestion.tags?.map((tag, i) => (
+                        <Badge key={i} variant="secondary" className="flex items-center gap-1">
+                          {tag}
+                          <button
+                            onClick={() => {
+                              const newTags = [...currentQuestion.tags];
+                              newTags.splice(i, 1);
+                              setCurrentQuestion({ ...currentQuestion, tags: newTags });
+                            }}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <Input
+                      id="question-tags"
+                      placeholder="Add a tag..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = e.currentTarget.value.trim();
+                          if (val && !currentQuestion.tags?.includes(val)) {
+                            setCurrentQuestion({
+                              ...currentQuestion,
+                              tags: [...(currentQuestion.tags || []), val]
+                            });
+                            e.currentTarget.value = '';
+                          }
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
