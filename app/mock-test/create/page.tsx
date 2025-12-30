@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { SaveTemplateDialog } from "@/components/mock-test/SaveTemplateDialog"
 import { useTestTemplate, TestDetails } from "../hooks/useTestTemplate"
 import { toast } from "@/components/ui/use-toast"
-import {BlockMath} from 'react-katex'
+import { BlockMath } from 'react-katex'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
@@ -30,11 +30,11 @@ function CreateTestContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const templateParam = searchParams.get('template')
-  
+
   // States for tracking API submission
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [testId, setTestId] = useState<string>("")
-  
+
   // Get template functionality from custom hook
   const {
     showSaveTemplateDialog,
@@ -48,10 +48,10 @@ function CreateTestContent() {
     saveTemplate,
     isSaving
   } = useTestTemplate()
-  
+
   // States for multi-step form
   const [activeStep, setActiveStep] = useState(1)
-  
+
   // Test details state
   const [testDetails, setTestDetails] = useState<TestDetails & { subject: string[] }>({
     title: "",
@@ -63,14 +63,18 @@ function CreateTestContent() {
     date: "",
     time: "",
   })
-  
+
   // Questions state
   const [questions, setQuestions] = useState<{
     text: string;
-    options: {id: string; text: string}[];
+    options: { id: string; text: string }[];
     correctAnswer: string;
+    for_class?: string[];
+    subjects?: string[];
+    topics?: string[];
+    tags?: string[];
   }[]>([])
-  
+
   // Current editing question
   const [currentQuestion, setCurrentQuestion] = useState({
     text: "",
@@ -81,17 +85,21 @@ function CreateTestContent() {
       { id: "d", text: "" },
     ],
     correctAnswer: "a",
+    for_class: ["11"],
+    subjects: ["Physics"],
+    topics: [] as string[],
+    tags: [] as string[],
     isEditMode: false,
     editIndex: -1
   })
-  
+
   // Load template from URL params if provided
   useEffect(() => {
     if (templateParam) {
       loadTemplateFromParams(templateParam, setTestDetails, testDetails)
     }
   }, [templateParam])
-  
+
   // Submit test details and move to questions step
   const handleSubmitDetails = async () => {
     if (!testDetails.title || !testDetails.description || !testDetails.date || !testDetails.time) {
@@ -102,19 +110,19 @@ function CreateTestContent() {
       })
       return
     }
-    
+
     setIsSubmitting(true)
-    
+
     try {
       // Convert date and time to timestamp
       const dateTimeString = `${testDetails.date}T${testDetails.time}:00`;
       const timestamp = new Date(dateTimeString).getTime();
-      
+
       // Convert subject to array if it's not already
-      const subjects = Array.isArray(testDetails.subject) 
-        ? testDetails.subject 
+      const subjects = Array.isArray(testDetails.subject)
+        ? testDetails.subject
         : [testDetails.subject];
-      
+
       // Prepare the request body
       const requestBody = {
         title: testDetails.title,
@@ -126,33 +134,33 @@ function CreateTestContent() {
         status: "draft",
         test_duration: testDetails.duration,
         test_date: timestamp,
-        max_score: testDetails.questions*4, // Default score, can be made configurable later
+        max_score: testDetails.questions * 4, // Default score, can be made configurable later
         are_questions_public: false, // Default value
         questions: testDetails.questions, // Number of questions
       };
-      
+
       // Send the request to the backend using our new API route
-      const response = await fetch('/mock-test/api/tests', {
+      const response = await fetch('/api/tests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestBody)
       });
-      
+
       const data = await response.json();
-      
-      
+
+
       if (data.success) {
         // Store the test ID for future use (like adding questions)
         setTestId(data.data.documentId || data.data._id || '');
-        
+
         // Show success message
         toast({
           title: "Test created",
           description: "Test details saved successfully"
         });
-        
+
         // Move to the next step
         setActiveStep(2);
       } else {
@@ -169,12 +177,12 @@ function CreateTestContent() {
       setIsSubmitting(false);
     }
   }
-  
+
   // Handle save template button click
   const handleSaveTemplate = () => {
     saveTemplate(testDetails)
   }
-  
+
   // Add or update question
   const handleAddQuestion = async () => {
     // Validate question
@@ -186,7 +194,17 @@ function CreateTestContent() {
       });
       return;
     }
-    
+
+    // Validate topics (Mandatory)
+    if (!currentQuestion.topics || currentQuestion.topics.length === 0) {
+      toast({
+        title: "Missing information",
+        description: "Please add at least one topic",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const correctOption = currentQuestion.options.find(opt => opt.id === currentQuestion.correctAnswer);
     if (!correctOption) {
       toast({
@@ -196,20 +214,20 @@ function CreateTestContent() {
       });
       return;
     }
-    
+
     // Get the index of the correct option (0 for A, 1 for B, etc.)
     const correctOptionIndex = currentQuestion.options.findIndex(opt => opt.id === currentQuestion.correctAnswer);
-    
+
     // Get subjects as array
-    const subjects = Array.isArray(testDetails.subject) 
-      ? testDetails.subject 
+    const subjects = Array.isArray(testDetails.subject)
+      ? testDetails.subject
       : [testDetails.subject];
-    
+
     // Construct payload for backend
     const payload = {
-      subjects: subjects,
-      for_class: ["11", "12", "dropper"],
-      topics: ["Mechanics"],
+      subjects: currentQuestion.subjects,
+      for_class: currentQuestion.for_class,
+      topics: currentQuestion.topics,
       difficulty: testDetails.difficulty || "Medium",
       origin: {
         type: "mock",
@@ -222,14 +240,14 @@ function CreateTestContent() {
         options: currentQuestion.options.map(opt => opt.text),
         correct_answer: correctOptionIndex.toString() // Send index (0-3) instead of text
       },
-      tags: ["JEE", "Mechanics", "Friction"],
+      tags: currentQuestion.tags,
       status: "active",
       created_by: "test@jeesimplified.com"
     };
-    
+
     // Send POST request to backend using our new API route
     try {
-      const response = await fetch("/mock-test/api/questions", {
+      const response = await fetch("/api/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -252,14 +270,18 @@ function CreateTestContent() {
       });
       return;
     }
-    
+
     // Prepare local question data
     const questionData = {
       text: currentQuestion.text,
       options: [...currentQuestion.options],
-      correctAnswer: currentQuestion.correctAnswer
+      correctAnswer: currentQuestion.correctAnswer,
+      for_class: currentQuestion.for_class,
+      subjects: currentQuestion.subjects,
+      topics: currentQuestion.topics,
+      tags: currentQuestion.tags
     };
-    
+
     if (currentQuestion.isEditMode && currentQuestion.editIndex >= 0) {
       // Update existing question
       const updatedQuestions = [...questions];
@@ -277,11 +299,11 @@ function CreateTestContent() {
         description: "Question has been added successfully"
       });
     }
-    
+
     // Reset form
     resetQuestionForm();
   };
-  
+
   // Reset question form
   const resetQuestionForm = () => {
     setCurrentQuestion({
@@ -293,32 +315,40 @@ function CreateTestContent() {
         { id: "d", text: "" },
       ],
       correctAnswer: "a",
+      for_class: ["11"],
+      subjects: ["Physics"],
+      topics: [] as string[],
+      tags: [] as string[],
       isEditMode: false,
       editIndex: -1
     })
   }
-  
+
   // Edit a question
   const handleEditQuestion = (index: number) => {
     const question = questions[index]
     setCurrentQuestion({
       ...question,
+      for_class: question.for_class || ["11"],
+      subjects: question.subjects || ["Physics"],
+      topics: question.topics || [],
+      tags: question.tags || [],
       isEditMode: true,
       editIndex: index
     })
   }
-  
+
   // Delete a question
   const handleDeleteQuestion = (index: number) => {
     const updatedQuestions = questions.filter((_, i) => i !== index)
     setQuestions(updatedQuestions)
-    
+
     toast({
       title: "Question deleted",
       description: "Question has been removed"
     });
   }
-  
+
   // Submit the entire test
   const handleSubmitTest = async () => {
     if (questions.length === 0) {
@@ -338,12 +368,12 @@ function CreateTestContent() {
       });
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
       // Update test status from draft to scheduled using our new API route
-      const updateResponse = await fetch('/mock-test/api/tests', {
+      const updateResponse = await fetch('/api/tests', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -353,19 +383,19 @@ function CreateTestContent() {
           status: 'scheduled'
         })
       });
-      
+
       const updateData = await updateResponse.json();
-      
+
       if (!updateData.success) {
         throw new Error(updateData.message || 'Failed to update test status');
       }
-      
+
       // Show success message
       toast({
         title: "Success",
         description: `Test "${testDetails.title}" published successfully with ${questions.length} questions!`
       });
-      
+
       // Navigate back to the tests list
       router.push('/mock-test');
     } catch (error) {
@@ -379,25 +409,25 @@ function CreateTestContent() {
       setIsSubmitting(false);
     }
   }
-  
+
   // Preview the test
   const handlePreviewTest = () => {
     if (questions.length === 0) {
       toast({
-        title: "Missing questions", 
+        title: "Missing questions",
         description: "Please add at least one question to preview",
         variant: "destructive"
       });
       return;
     }
-    
+
     // In a real app, you would save the draft and redirect to a preview page
     toast({
       title: "Coming soon",
       description: "Preview functionality will be implemented soon"
     });
   }
-  
+
   // Check if we have added enough questions
   const hasEnoughQuestions = questions.length >= testDetails.questions;
 
@@ -410,15 +440,15 @@ function CreateTestContent() {
       katex.renderToString(latex);
       setLatexErrors(prev => ({ ...prev, [index]: null }));
     } catch (err) {
-      setLatexErrors(prev => ({ ...prev, [index]: 'Invalid LaTeX syntax.' + {err}}));
+      setLatexErrors(prev => ({ ...prev, [index]: 'Invalid LaTeX syntax.' + { err } }));
     }
   };
 
-  
+
   return (
     <div className="container py-8">
       {/* Save Template Dialog - Using the extracted component */}
-      <SaveTemplateDialog 
+      <SaveTemplateDialog
         open={showSaveTemplateDialog}
         onOpenChange={setShowSaveTemplateDialog}
         templateName={templateName}
@@ -437,7 +467,7 @@ function CreateTestContent() {
           </Button>
           <h1 className="text-2xl font-bold">Create New Test</h1>
         </div>
-        
+
         <div className="flex items-center gap-4">
           <div className="flex items-center">
             <div className={`w-8 h-8 flex items-center justify-center rounded-full border ${activeStep >= 1 ? 'bg-primary text-primary-foreground' : 'border-muted text-muted-foreground'} mr-2`}>
@@ -461,7 +491,7 @@ function CreateTestContent() {
           </div>
         </div>
       </div>
-      
+
       {/* Step 1: Test Details */}
       {activeStep === 1 && (
         <Card className="p-6">
@@ -473,29 +503,29 @@ function CreateTestContent() {
               </Badge>
             )}
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="test-title">Test Title</Label>
-                <Input 
-                  id="test-title" 
-                  placeholder="e.g. JEE Advanced Physics Mock Test" 
+                <Input
+                  id="test-title"
+                  placeholder="e.g. JEE Advanced Physics Mock Test"
                   value={testDetails.title}
-                  onChange={(e) => setTestDetails({...testDetails, title: e.target.value})}
+                  onChange={(e) => setTestDetails({ ...testDetails, title: e.target.value })}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="test-description">Description</Label>
-                <Input 
-                  id="test-description" 
-                  placeholder="Brief description of the test" 
+                <Input
+                  id="test-description"
+                  placeholder="Brief description of the test"
                   value={testDetails.description}
-                  onChange={(e) => setTestDetails({...testDetails, description: e.target.value})}
+                  onChange={(e) => setTestDetails({ ...testDetails, description: e.target.value })}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="test-subject">Subject(s)</Label>
                 <div className="flex flex-wrap gap-2">
@@ -513,12 +543,12 @@ function CreateTestContent() {
                           : Array.isArray(testDetails.subject)
                             ? testDetails.subject.filter(s => s !== "Physics")
                             : [];
-                        setTestDetails({...testDetails, subject: updatedSubjects});
+                        setTestDetails({ ...testDetails, subject: updatedSubjects });
                       }}
                     />
                     <Label htmlFor="physics-checkbox" className="text-sm font-normal">Physics</Label>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
@@ -533,12 +563,12 @@ function CreateTestContent() {
                           : Array.isArray(testDetails.subject)
                             ? testDetails.subject.filter(s => s !== "Chemistry")
                             : [];
-                        setTestDetails({...testDetails, subject: updatedSubjects});
+                        setTestDetails({ ...testDetails, subject: updatedSubjects });
                       }}
                     />
                     <Label htmlFor="chemistry-checkbox" className="text-sm font-normal">Chemistry</Label>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
@@ -553,7 +583,7 @@ function CreateTestContent() {
                           : Array.isArray(testDetails.subject)
                             ? testDetails.subject.filter(s => s !== "Mathematics")
                             : [];
-                        setTestDetails({...testDetails, subject: updatedSubjects});
+                        setTestDetails({ ...testDetails, subject: updatedSubjects });
                       }}
                     />
                     <Label htmlFor="mathematics-checkbox" className="text-sm font-normal">Mathematics</Label>
@@ -561,35 +591,35 @@ function CreateTestContent() {
                 </div>
               </div>
             </div>
-            
+
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="test-questions">Number of Questions</Label>
-                <Input 
-                  id="test-questions" 
-                  type="number" 
+                <Input
+                  id="test-questions"
+                  type="number"
                   min="1"
                   value={testDetails.questions}
-                  onChange={(e) => setTestDetails({...testDetails, questions: parseInt(e.target.value) || 0})}
+                  onChange={(e) => setTestDetails({ ...testDetails, questions: parseInt(e.target.value) || 0 })}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="test-duration">Duration (minutes)</Label>
-                <Input 
-                  id="test-duration" 
-                  type="number" 
+                <Input
+                  id="test-duration"
+                  type="number"
                   min="1"
                   value={testDetails.duration}
-                  onChange={(e) => setTestDetails({...testDetails, duration: parseInt(e.target.value) || 0})}
+                  onChange={(e) => setTestDetails({ ...testDetails, duration: parseInt(e.target.value) || 0 })}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="test-difficulty">Difficulty</Label>
-                <Select 
+                <Select
                   value={testDetails.difficulty}
-                  onValueChange={(value) => setTestDetails({...testDetails, difficulty: value})}
+                  onValueChange={(value) => setTestDetails({ ...testDetails, difficulty: value })}
                 >
                   <SelectTrigger id="test-difficulty">
                     <SelectValue placeholder="Select difficulty" />
@@ -603,43 +633,43 @@ function CreateTestContent() {
               </div>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             <div className="space-y-2">
               <Label htmlFor="test-date">Test Date</Label>
-              <Input 
-                id="test-date" 
-                type="date" 
+              <Input
+                id="test-date"
+                type="date"
                 value={testDetails.date}
-                onChange={(e) => setTestDetails({...testDetails, date: e.target.value})}
+                onChange={(e) => setTestDetails({ ...testDetails, date: e.target.value })}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="test-time">Test Time</Label>
-              <Input 
-                id="test-time" 
-                type="time" 
+              <Input
+                id="test-time"
+                type="time"
                 value={testDetails.time}
-                onChange={(e) => setTestDetails({...testDetails, time: e.target.value})}
+                onChange={(e) => setTestDetails({ ...testDetails, time: e.target.value })}
               />
             </div>
           </div>
-          
+
           <div className="mt-8 flex justify-between">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowSaveTemplateDialog(true)}
               className="flex items-center gap-2"
             >
               <Save className="h-4 w-4" /> Save as Template
             </Button>
-            
+
             <div className="flex gap-4">
               <Button variant="outline" onClick={() => router.push('/mock-test')}>
                 Cancel
               </Button>
-              <Button 
+              <Button
                 className="takeuforward-button"
                 onClick={handleSubmitDetails}
                 disabled={isSubmitting}
@@ -650,7 +680,7 @@ function CreateTestContent() {
           </div>
         </Card>
       )}
-      
+
       {/* Step 2: Add Questions */}
       {activeStep === 2 && (
         <div className="space-y-6">
@@ -683,9 +713,9 @@ function CreateTestContent() {
                             <Button size="sm" variant="outline" className="text-xs" onClick={() => handleEditQuestion(index)}>
                               <Edit className="h-3 w-3 mr-1" /> Edit
                             </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
+                            <Button
+                              size="sm"
+                              variant="outline"
                               className="text-xs text-red-500 hover:text-red-600"
                               onClick={() => handleDeleteQuestion(index)}
                             >
@@ -698,14 +728,14 @@ function CreateTestContent() {
                   </tbody>
                 </table>
               </div>
-              
+
               <div className="flex justify-between">
                 <Button variant="outline" onClick={() => setActiveStep(1)}>
                   <ChevronLeft className="mr-2 h-4 w-4" /> Back to Details
                 </Button>
-                
-                <Button 
-                  className="takeuforward-button" 
+
+                <Button
+                  className="takeuforward-button"
                   onClick={() => setActiveStep(3)}
                   disabled={!hasEnoughQuestions}
                   title={!hasEnoughQuestions ? `Add ${testDetails.questions - questions.length} more questions to continue` : "Continue to review"}
@@ -715,22 +745,22 @@ function CreateTestContent() {
               </div>
             </Card>
           )}
-          
+
           {/* Add New Question Form - Hide when we have enough questions */}
           {!hasEnoughQuestions && (
             <Card className="p-6">
               {/* Display progress message */}
               <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-md">
                 <p className="text-blue-700 dark:text-blue-400 text-sm">
-                  {questions.length === 0 
-                    ? `Please add ${testDetails.questions} questions to continue.` 
+                  {questions.length === 0
+                    ? `Please add ${testDetails.questions} questions to continue.`
                     : questions.length === 1
-                    ? `You've added 1 question. ${testDetails.questions - questions.length} more ${testDetails.questions - questions.length === 1 ? 'question is' : 'questions are'} required.`
-                    : `You've added ${questions.length} questions. ${testDetails.questions - questions.length} more ${testDetails.questions - questions.length === 1 ? 'question is' : 'questions are'} required.`
+                      ? `You've added 1 question. ${testDetails.questions - questions.length} more ${testDetails.questions - questions.length === 1 ? 'question is' : 'questions are'} required.`
+                      : `You've added ${questions.length} questions. ${testDetails.questions - questions.length} more ${testDetails.questions - questions.length === 1 ? 'question is' : 'questions are'} required.`
                   }
                 </p>
               </div>
-              
+
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="font-semibold">
@@ -744,6 +774,136 @@ function CreateTestContent() {
                   </button>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Class Selection */}
+                  <div className="space-y-2">
+                    <Label>Class</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {["11", "12", "dropper"].map((cls) => (
+                        <div key={cls} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`class-${cls}`}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            checked={currentQuestion.for_class?.includes(cls)}
+                            onChange={(e) => {
+                              const updatedClass = e.target.checked
+                                ? [...(currentQuestion.for_class || []), cls]
+                                : (currentQuestion.for_class || []).filter(c => c !== cls);
+                              setCurrentQuestion({ ...currentQuestion, for_class: updatedClass });
+                            }}
+                          />
+                          <Label htmlFor={`class-${cls}`} className="text-sm font-normal capitalize">{cls}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Subject Selection */}
+                  <div className="space-y-2">
+                    <Label>Subject</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {["Physics", "Chemistry", "Mathematics"].map((sub) => (
+                        <div key={sub} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`subject-${sub}`}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            checked={currentQuestion.subjects?.includes(sub)}
+                            onChange={(e) => {
+                              const updatedSubjects = e.target.checked
+                                ? [...(currentQuestion.subjects || []), sub]
+                                : (currentQuestion.subjects || []).filter(s => s !== sub);
+                              setCurrentQuestion({ ...currentQuestion, subjects: updatedSubjects });
+                            }}
+                          />
+                          <Label htmlFor={`subject-${sub}`} className="text-sm font-normal">{sub}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Topics Input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="question-topics">Topics (Press Enter to add)</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {currentQuestion.topics?.map((topic, i) => (
+                        <Badge key={i} variant="secondary" className="flex items-center gap-1">
+                          {topic}
+                          <button
+                            onClick={() => {
+                              const newTopics = [...currentQuestion.topics];
+                              newTopics.splice(i, 1);
+                              setCurrentQuestion({ ...currentQuestion, topics: newTopics });
+                            }}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <Input
+                      id="question-topics"
+                      placeholder="Add a topic..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = e.currentTarget.value.trim();
+                          if (val && !currentQuestion.topics?.includes(val)) {
+                            setCurrentQuestion({
+                              ...currentQuestion,
+                              topics: [...(currentQuestion.topics || []), val]
+                            });
+                            e.currentTarget.value = '';
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {/* Tags Input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="question-tags">Tags (Press Enter to add)</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {currentQuestion.tags?.map((tag, i) => (
+                        <Badge key={i} variant="secondary" className="flex items-center gap-1">
+                          {tag}
+                          <button
+                            onClick={() => {
+                              const newTags = [...currentQuestion.tags];
+                              newTags.splice(i, 1);
+                              setCurrentQuestion({ ...currentQuestion, tags: newTags });
+                            }}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <Input
+                      id="question-tags"
+                      placeholder="Add a tag..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = e.currentTarget.value.trim();
+                          if (val && !currentQuestion.tags?.includes(val)) {
+                            setCurrentQuestion({
+                              ...currentQuestion,
+                              tags: [...(currentQuestion.tags || []), val]
+                            });
+                            e.currentTarget.value = '';
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="question-text">Question Text</Label>
                   <textarea
@@ -753,7 +913,7 @@ function CreateTestContent() {
                     onChange={(e) => {
                       const text = e.target.value;
                       setCurrentQuestion({ ...currentQuestion, text });
-                      validateLatex(text, -1); 
+                      validateLatex(text, -1);
                     }}
                     className="w-full min-h-[100px] p-3 border border-gray-300 rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     rows={3}
@@ -807,10 +967,10 @@ function CreateTestContent() {
                   ))}
                 </div>
 
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="correct-answer">Correct Answer</Label>
-                  <Select 
+                  <Select
                     value={currentQuestion.correctAnswer}
                     onValueChange={(value) => setCurrentQuestion({
                       ...currentQuestion,
@@ -829,22 +989,22 @@ function CreateTestContent() {
                   </Select>
                 </div>
               </div>
-              
+
               <div className="flex justify-end gap-4 mt-6">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={resetQuestionForm}
                 >
                   {currentQuestion.isEditMode ? "Cancel Edit" : "Clear Form"}
                 </Button>
-                <Button 
-                  className="takeuforward-button" 
+                <Button
+                  className="takeuforward-button"
                   onClick={handleAddQuestion}
                 >
                   {currentQuestion.isEditMode ? "Update Question" : "Add Question"}
                 </Button>
               </div>
-              
+
               {questions.length === 0 && (
                 <div className="mt-8 pt-6 border-t flex justify-between">
                   <Button variant="outline" onClick={() => setActiveStep(1)}>
@@ -854,7 +1014,7 @@ function CreateTestContent() {
               )}
             </Card>
           )}
-          
+
           {/* Show a message when enough questions have been added */}
           {hasEnoughQuestions && !questions[0]?.text.includes("editing") && (
             <Card className="p-6 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900">
@@ -870,13 +1030,13 @@ function CreateTestContent() {
           )}
         </div>
       )}
-      
+
       {/* Step 3: Review & Publish */}
       {activeStep === 3 && (
         <div className="space-y-6">
           <Card className="p-6">
             <h3 className="text-xl font-medium mb-6">Review Test Details</h3>
-            
+
             <div className="space-y-6">
               <div className="bg-muted/30 p-4 rounded-lg">
                 <div className="flex justify-between items-start mb-4">
@@ -886,13 +1046,13 @@ function CreateTestContent() {
                   </div>
                   <Badge className={
                     testDetails.difficulty === "Hard" ? "bg-red-500/90" :
-                    testDetails.difficulty === "Medium" ? "bg-amber-500/90" :
-                    "bg-green-500/90"
+                      testDetails.difficulty === "Medium" ? "bg-amber-500/90" :
+                        "bg-green-500/90"
                   }>
                     {testDetails.difficulty}
                   </Badge>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">Subject:</span> {testDetails.subject.join(', ')}
@@ -908,7 +1068,7 @@ function CreateTestContent() {
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <h4 className="text-lg font-medium mb-2">Questions ({questions.length})</h4>
                 <div className="max-h-[400px] overflow-y-auto">
@@ -921,8 +1081,8 @@ function CreateTestContent() {
                       <p className="mt-2">{question.text}</p>
                       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
                         {question.options.map((option) => (
-                          <div 
-                            key={option.id} 
+                          <div
+                            key={option.id}
                             className={`p-2 rounded border ${option.id === question.correctAnswer ? 'border-green-500 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400' : 'border-muted'}`}
                           >
                             <strong>{option.id.toUpperCase()}:</strong> {option.text}
@@ -934,20 +1094,20 @@ function CreateTestContent() {
                 </div>
               </div>
             </div>
-            
+
             <div className="mt-8 flex justify-between">
               <div>
                 <Button variant="outline" onClick={() => setActiveStep(2)}>
                   <ChevronLeft className="mr-2 h-4 w-4" /> Back to Questions
                 </Button>
               </div>
-              
+
               <div className="flex gap-4">
                 <Button variant="outline" onClick={handlePreviewTest}>
                   Preview Test
                 </Button>
-                <Button 
-                  className="takeuforward-button" 
+                <Button
+                  className="takeuforward-button"
                   onClick={handleSubmitTest}
                   disabled={isSubmitting}
                 >
@@ -960,4 +1120,4 @@ function CreateTestContent() {
       )}
     </div>
   )
-} 
+}

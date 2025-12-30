@@ -19,9 +19,12 @@ import { Template } from "./hooks/getTemplates"
 import { toast } from "@/components/ui/use-toast"
 
 import { useUser } from "@clerk/nextjs"
+import { useServerTime } from "./hooks/useServerTime"
+import { CountdownTimer } from "./components/CountdownTimer"
 
 export default function MockTestPage() {
   const { user } = useUser()
+  const currentTime = useServerTime()
   const router = useRouter()
   const { templates, isLoading: isLoadingTemplates, deleteTemplate } = useTemplates()
   const [currentQuestion, setCurrentQuestion] = useState(0)
@@ -29,7 +32,6 @@ export default function MockTestPage() {
   const [timeRemaining, setTimeRemaining] = useState(5400) // 90 minutes in seconds
   const [isTestSubmitted, setIsTestSubmitted] = useState(false)
   const [activeTab, setActiveTab] = useState("upcoming-tests")
-  const [isTestStarted, setIsTestStarted] = useState(false)
   const [selectedTest, setSelectedTest] = useState<{
     id?: string;
     title: string;
@@ -82,9 +84,11 @@ export default function MockTestPage() {
     time: string;
     registrations: number;
     isRegistered?: boolean;
+    timestamp?: number;
   }[]>([])
   const [isLoadingUpcomingTests, setIsLoadingUpcomingTests] = useState(false)
   const [registeredTestIds, setRegisteredTestIds] = useState<Set<string>>(new Set())
+  const [submittedTestIds, setSubmittedTestIds] = useState<Set<string>>(new Set())
 
   // Define API test data interface
   interface APITest {
@@ -264,17 +268,7 @@ export default function MockTestPage() {
     ],
   }
 
-  // Timer effect
-  useEffect(() => {
-    if (timeRemaining > 0 && isTestStarted && !isTestSubmitted) {
-      const timer = setTimeout(() => {
-        setTimeRemaining(timeRemaining - 1);
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else if (timeRemaining === 0 && isTestStarted && !isTestSubmitted) {
-      handleSubmitTest();
-    }
-  }, [timeRemaining, isTestStarted, isTestSubmitted]);
+
 
   const handleAnswerSelect = (value: string) => {
     setSelectedAnswers({
@@ -317,14 +311,19 @@ export default function MockTestPage() {
     time: string;
     registrations?: number;
   }) => {
-    // Make sure we store the test data with consistent id type
-    const formattedTest = {
-      ...test,
-      id: test.id?.toString() // Convert the id to string for consistency
-    };
-    setSelectedTest(formattedTest);
-    setIsTestStarted(true);
-    setTimeRemaining(test.duration * 60); // Convert minutes to seconds
+    if (!test.id) return;
+
+    // Check if test has already been submitted
+    if (submittedTestIds.has(test.id)) {
+      toast({
+        title: "Test Already Submitted",
+        description: "You have already completed this test.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    router.push(`/mock-test/take/${test.id}`);
   };
 
   const handleTestRegistration = async (test: {
@@ -736,7 +735,8 @@ export default function MockTestPage() {
             difficulty: test.difficulty,
             date: formattedDate,
             time: formattedTime,
-            registrations: test.registered_count
+            registrations: test.registered_count,
+            timestamp: test.test_date
           }
         })
 
@@ -771,12 +771,57 @@ export default function MockTestPage() {
     }
   }
 
-  // Fetch registered tests when user loads
+  // Fetch submitted tests for the user
+  const fetchSubmittedTests = async () => {
+    if (!user || !user.primaryEmailAddress?.emailAddress) return;
+
+    try {
+      console.log("Fetching submitted tests for:", user.primaryEmailAddress.emailAddress);
+
+      // Get all upcoming test IDs to send to backend
+      const testIds = upcomingTests.map(test => test.id);
+
+      if (testIds.length === 0) return; // No tests to check
+
+      const response = await fetch(apiUrls.users.getSubmittedTests, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_email: user.primaryEmailAddress.emailAddress,
+          test_ids: testIds
+        })
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      console.log("Submitted tests response:", data);
+
+      if (data.success && data.data) {
+        // data.data should be an array of test IDs that user has submitted
+        const ids = new Set<string>(data.data);
+        setSubmittedTestIds(ids);
+      }
+    } catch (error) {
+      console.error('Error fetching submitted tests:', error);
+    }
+  }
+
+  // Fetch registered and submitted tests when user loads
   useEffect(() => {
     if (user) {
       fetchRegisteredTests();
     }
   }, [user]);
+
+  // Fetch submitted tests when upcomingTests are loaded
+  useEffect(() => {
+    if (user && upcomingTests.length > 0) {
+      fetchSubmittedTests();
+    }
+  }, [user, upcomingTests]);
 
   // Fetch upcoming tests when component mounts and when tab changes to upcoming-tests
   useEffect(() => {
@@ -785,120 +830,7 @@ export default function MockTestPage() {
     }
   }, [activeTab])
 
-  if (isTestStarted) {
-    return (
-      <div className="min-h-screen bg-background">
-        <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-14 items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => setIsTestStarted(false)}>
-                <ChevronLeft className="h-4 w-4 mr-1" /> Exit Test
-              </Button>
-              <span className="font-medium">{selectedTest?.title}</span>
-            </div>
-            <div className={getTimerClass()}>
-              <Clock className="h-5 w-5 mr-2" />
-              <span className="font-medium">{formatTime(timeRemaining)}</span>
-            </div>
-          </div>
-        </header>
 
-        <main className="container py-6">
-          <div className="mb-6">
-            <div className="flex items-center justify-between mt-2">
-              <div className="text-sm text-muted-foreground">
-                {Object.keys(selectedAnswers).length} of {mockTest.totalQuestions} questions answered
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Time remaining: {Math.floor(timeRemaining / 60)} minutes
-              </div>
-            </div>
-            <div className="progress-bar mt-2">
-              <div className="progress-bar-fill" style={{ width: `${progressPercentage}%` }}></div>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-[300px_1fr] gap-6">
-            {/* Question Navigator */}
-            <Card className="takeuforward-card p-4 h-fit">
-              <h2 className="font-medium mb-4">Question Navigator</h2>
-              <div className="grid grid-cols-5 gap-2 mb-6">
-                {Array.from({ length: mockTest.totalQuestions }).map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleJumpToQuestion(index)}
-                    className={`flex items-center justify-center h-10 w-10 rounded-md text-sm font-medium transition-colors ${getQuestionStatus(index) === "current"
-                      ? "bg-primary text-primary-foreground"
-                      : getQuestionStatus(index) === "answered"
-                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                        : "bg-muted hover:bg-muted/80"
-                      }`}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="flex items-center gap-1">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>{Object.keys(selectedAnswers).length} Answered</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="flex items-center gap-1">
-                    <HelpCircle className="h-4 w-4 text-primary" />
-                    <span>{mockTest.totalQuestions - Object.keys(selectedAnswers).length} Unanswered</span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-6">
-                <Button className="w-full takeuforward-button" onClick={handleSubmitTest}>
-                  Submit Test
-                </Button>
-              </div>
-            </Card>
-
-            {/* Question Content */}
-            <Card className="takeuforward-card p-6">
-              <div className="space-y-6">
-                <div>
-                  <div className="text-sm text-muted-foreground mb-2">
-                    Question {currentQuestion + 1} of {mockTest.totalQuestions}
-                  </div>
-                  <h3 className="text-xl font-medium">{mockTest.questions[currentQuestion].text}</h3>
-                </div>
-
-                <RadioGroup
-                  value={selectedAnswers[currentQuestion] || ""}
-                  onValueChange={handleAnswerSelect}
-                  className="space-y-4"
-                >
-                  {mockTest.questions[currentQuestion].options.map((option) => (
-                    <div key={option.id} className="test-option flex items-center space-x-2 rounded-md border p-3 hover:bg-muted/50">
-                      <RadioGroupItem value={option.id} id={`option-${option.id}`} />
-                      <Label htmlFor={`option-${option.id}`} className="flex-1 cursor-pointer">
-                        {option.text}
-                      </Label>
-                    </div>
-                  ))}
-                </RadioGroup>
-
-                <div className="flex items-center justify-between pt-4 border-t">
-                  <Button variant="outline" onClick={handlePreviousQuestion} disabled={currentQuestion === 0}>
-                    <ChevronLeft className="mr-2 h-4 w-4" /> Previous
-                  </Button>
-                  <Button onClick={handleNextQuestion} disabled={currentQuestion === mockTest.questions.length - 1}>
-                    Next <ChevronRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </main>
-      </div>
-    );
-  }
 
   return (
     <div className="leetcode-container py-8">
@@ -1180,73 +1112,107 @@ export default function MockTestPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {upcomingTests.map((test) => (
-                <Card key={test.id} className="takeuforward-card overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/20">
-                  <div className="p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex flex-wrap gap-1">
-                        {test.subjects?.map((subj: string, idx: number) => (
-                          <Badge key={idx} className="bg-primary/80 text-primary-foreground">{subj}</Badge>
-                        ))}
-                      </div>
-                      <Badge variant="outline" className={
-                        test.difficulty === "Hard" ? "border-red-500 text-red-500" :
-                          test.difficulty === "Medium" ? "border-amber-500 text-amber-500" :
-                            "border-green-500 text-green-500"
-                      }>
-                        {test.difficulty}
-                      </Badge>
-                    </div>
-                    <h3 className="text-xl font-bold mb-2">{test.title}</h3>
-                    <p className="text-muted-foreground text-sm mb-4">{test.description}</p>
-                    <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
-                      <div className="flex items-center">
-                        <Calendar className="h-4 w-4 mr-1" />
-                        <span>{test.date}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Clock className="h-4 w-4 mr-1" />
-                        <span>{test.time}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-muted-foreground mb-6">
-                      <div className="flex items-center">
-                        <HelpCircle className="h-4 w-4 mr-1" />
-                        <span>{test.questions} Questions</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Timer className="h-4 w-4 mr-1" />
-                        <span>{test.duration} Minutes</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs text-muted-foreground">
-                        <span className="font-medium text-primary">{test.registrations}</span> registrations
-                      </div>
-                      <div className="flex gap-2">
-                        {registeredTestIds.has(test.id) ? (
-                          <>
-                            <Button className="takeuforward-button bg-green-600 hover:bg-green-700" disabled>
-                              Registered
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 dark:border-red-800 dark:hover:bg-red-900/30"
-                              onClick={() => handleTestUnregistration(test)}
-                            >
-                              Unregister
-                            </Button>
-                          </>
-                        ) : (
-                          <Button className="takeuforward-button" onClick={() => handleTestRegistration(test)}>
-                            Register
-                          </Button>
+              {upcomingTests
+                .filter((test) => {
+                  // Filter out expired tests (where current time > test start time + duration)
+                  if (!test.timestamp || !test.duration) return true;
+                  const testEndTime = test.timestamp + (test.duration * 60 * 1000);
+                  return currentTime.getTime() < testEndTime;
+                })
+                .map((test) => {
+                  const isLive = test.timestamp && currentTime.getTime() >= test.timestamp;
+                  return (
+                    <Card key={test.id} className={`takeuforward-card overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/20 relative ${isLive ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : ''}`}>
+                      <div className="p-6">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex flex-wrap gap-1">
+                            {test.subjects?.map((subj: string, idx: number) => (
+                              <Badge key={idx} className="bg-primary/80 text-primary-foreground">{subj}</Badge>
+                            ))}
+                          </div>
+                          <Badge variant="outline" className={
+                            test.difficulty === "Hard" ? "border-red-500 text-red-500" :
+                              test.difficulty === "Medium" ? "border-amber-500 text-amber-500" :
+                                "border-green-500 text-green-500"
+                          }>
+                            {test.difficulty}
+                          </Badge>
+                          {isLive && (
+                            <div className="flex items-center gap-1.5 bg-red-100 dark:bg-red-900/30 px-2 py-0.5 rounded-full border border-red-200 dark:border-red-800">
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                              </span>
+                              <span className="text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wider">Live</span>
+                            </div>
+                          )}
+                        </div>
+                        {test.timestamp && (
+                          <div className="mb-3">
+                            <CountdownTimer targetDate={test.timestamp} currentTime={currentTime} />
+                          </div>
                         )}
+                        <h3 className="text-xl font-bold mb-2">{test.title}</h3>
+                        <p className="text-muted-foreground text-sm mb-4">{test.description}</p>
+                        <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-1" />
+                            <span>{test.date}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <Clock className="h-4 w-4 mr-1" />
+                            <span>{test.time}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-sm text-muted-foreground mb-6">
+                          <div className="flex items-center">
+                            <HelpCircle className="h-4 w-4 mr-1" />
+                            <span>{test.questions} Questions</span>
+                          </div>
+                          <div className="flex items-center">
+                            <Timer className="h-4 w-4 mr-1" />
+                            <span>{test.duration} Minutes</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-muted-foreground">
+                            <span className="font-medium text-primary">{test.registrations}</span> registrations
+                          </div>
+                          <div className="flex gap-2">
+                            {submittedTestIds.has(test.id) ? (
+                              <Button className="takeuforward-button bg-gray-500 hover:bg-gray-600" disabled>
+                                Submitted
+                              </Button>
+                            ) : registeredTestIds.has(test.id) ? (
+                              test.timestamp && currentTime.getTime() >= test.timestamp ? (
+                                <Button className="takeuforward-button bg-green-600 hover:bg-green-700" onClick={() => handleStartTest(test)}>
+                                  Start Test
+                                </Button>
+                              ) : (
+                                <>
+                                  <Button className="takeuforward-button bg-green-600 hover:bg-green-700" disabled>
+                                    Registered
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    className="border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 dark:border-red-800 dark:hover:bg-red-900/30"
+                                    onClick={() => handleTestUnregistration(test)}
+                                  >
+                                    Unregister
+                                  </Button>
+                                </>
+                              )
+                            ) : (
+                              <Button className="takeuforward-button" onClick={() => handleTestRegistration(test)}>
+                                Register
+                              </Button>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
+                    </Card>
+                  );
+                })}
             </div>
           )}
         </TabsContent>
