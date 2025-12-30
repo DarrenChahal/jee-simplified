@@ -696,18 +696,39 @@ export default function MockTestPage() {
     }
   }
 
-  // Function to fetch upcoming (scheduled) tests
+  // Function to fetch upcoming (scheduled and live) tests
   const fetchUpcomingTests = async () => {
     setIsLoadingUpcomingTests(true)
     try {
-      const response = await fetch(`${apiUrls.tests.getAll}?status=scheduled`)
+      // Fetch both scheduled and live tests in parallel
+      const [scheduledResponse, liveResponse] = await Promise.all([
+        fetch(`${apiUrls.tests.getAll}?status=scheduled`),
+        fetch(`${apiUrls.tests.getAll}?status=live`)
+      ]);
 
-      if (!response.ok) {
-        console.error('Failed to fetch upcoming tests:', response.status)
-        return
+      let allTests: any[] = [];
+
+      // Process scheduled tests
+      if (scheduledResponse.ok) {
+        const scheduledData = await scheduledResponse.json();
+        if (scheduledData.success && scheduledData.data && scheduledData.data.documents) {
+          allTests = [...allTests, ...scheduledData.data.documents];
+        }
+      } else {
+        console.error('Failed to fetch scheduled tests:', scheduledResponse.status);
       }
 
-      const data = await response.json()
+      // Process live tests
+      if (liveResponse.ok) {
+        const liveData = await liveResponse.json();
+        if (liveData.success && liveData.data && liveData.data.documents) {
+          allTests = [...allTests, ...liveData.data.documents];
+        }
+      } else {
+        console.error('Failed to fetch live tests:', liveResponse.status);
+      }
+
+      const data = { success: allTests.length > 0, data: { documents: allTests } }
 
       if (data.success && data.data && data.data.documents) {
         const formattedTests = data.data.documents.map((test: APITest) => {
@@ -730,12 +751,12 @@ export default function MockTestPage() {
             description: test.description,
             subject: Array.isArray(test.subjects) ? test.subjects[0] : (test.subject || "General"),
             subjects: Array.isArray(test.subjects) ? test.subjects : [test.subject || "General"],
-            questions: test.questions,
-            duration: test.test_duration,
-            difficulty: test.difficulty,
+            questions: test.questions || 0,
+            duration: test.test_duration || test.duration || 90,
+            difficulty: test.difficulty || "Medium",
             date: formattedDate,
             time: formattedTime,
-            registrations: test.registered_count,
+            registrations: test.registered_count || 0,
             timestamp: test.test_date
           }
         })
