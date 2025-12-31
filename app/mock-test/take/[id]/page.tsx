@@ -57,8 +57,8 @@ interface QuestionState {
 }
 
 // Deterministic ID Generation
-const generateAnswerId = (userId: string, questionId: string): string => {
-    return `${userId}_${questionId}`;
+const generateAnswerId = (userId: string, questionId: string, timestamp: number): string => {
+    return `${userId}_${questionId}_${timestamp}`;
 };
 
 export default function TakeTestPage() {
@@ -84,6 +84,7 @@ export default function TakeTestPage() {
 
     // Session State
     const [questionStartTime, setQuestionStartTime] = useState<number>(0)
+    const practiceSessionStartTime = useRef(Date.now());
 
     // User ID - using email as user identifier
     const [userId, setUserId] = useState<string>("")
@@ -444,7 +445,17 @@ export default function TakeTestPage() {
         // --- BACKGROUND SYNC ---
 
         // Generate deterministic ID
-        const answerId = generateAnswerId(userId, currentQ._id);
+        // Calculate effective timestamp (ID)
+        const testEndTime = testDetails?.test_date && testDetails?.duration
+            ? testDetails.test_date + (testDetails.duration * 60 * 1000)
+            : 0;
+
+        const effectiveAttemptId = (testDetails?.test_date && Date.now() < testEndTime)
+            ? testDetails.test_date
+            : practiceSessionStartTime.current;
+
+        // Generate deterministic ID with Timestamp
+        const answerId = generateAnswerId(userId, currentQ._id, effectiveAttemptId);
 
         // Prepare answer payload
         let payloadAnswer: UserAnswer = {};
