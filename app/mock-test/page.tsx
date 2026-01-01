@@ -67,8 +67,9 @@ export default function MockTestPage() {
   }[]>([])
   const [isLoadingAdminTests, setIsLoadingAdminTests] = useState(false)
 
-  // Mock user role for demonstration - this would normally come from an auth system
-  const [userRole] = useState("admin") // For testing purposes, set to "admin"
+  // Real admin check state
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true)
 
   // Add state for upcoming tests
   const [upcomingTests, setUpcomingTests] = useState<{
@@ -89,6 +90,23 @@ export default function MockTestPage() {
   const [isLoadingUpcomingTests, setIsLoadingUpcomingTests] = useState(false)
   const [registeredTestIds, setRegisteredTestIds] = useState<Set<string>>(new Set())
   const [submittedTestIds, setSubmittedTestIds] = useState<Set<string>>(new Set())
+
+  // My Mock Tests State
+  const [myTestsData, setMyTestsData] = useState<{
+    id: string;
+    title: string;
+    date: string;
+    time: string;
+    rating: string;
+    finishTime: string;
+    solved: string;
+    ranking: string;
+    ratingClass: string;
+  }[]>([])
+  const [isLoadingMyTests, setIsLoadingMyTests] = useState(false)
+  const [myTestsPage, setMyTestsPage] = useState(1)
+  const [myTestsTotalPages, setMyTestsTotalPages] = useState(1)
+  const [myTestsTotalCount, setMyTestsTotalCount] = useState(0)
 
   // Define API test data interface
   interface APITest {
@@ -166,64 +184,7 @@ export default function MockTestPage() {
     },
   ]
 
-  // My mock tests data
-  const myTests = [
-    {
-      id: 1,
-      title: "Weekly Contest 437",
-      date: "Feb 16, 2024",
-      time: "8:00 AM",
-      rating: "+19 1860",
-      finishTime: "0:36:17",
-      solved: "2 / 4",
-      ranking: "2584 / 30717",
-      ratingClass: "text-green-500",
-    },
-    {
-      id: 2,
-      title: "Biweekly Contest 150",
-      date: "Feb 15, 2024",
-      time: "8:00 PM",
-      rating: "+39 1841",
-      finishTime: "0:19:30",
-      solved: "2 / 4",
-      ranking: "1654 / 34958",
-      ratingClass: "text-green-500",
-    },
-    {
-      id: 3,
-      title: "Weekly Contest 421",
-      date: "Oct 27, 2023",
-      time: "8:00 AM",
-      rating: "+36 1801",
-      finishTime: "0:40:36",
-      solved: "2 / 4",
-      ranking: "2036 / 27902",
-      ratingClass: "text-green-500",
-    },
-    {
-      id: 4,
-      title: "Weekly Contest 420",
-      date: "Oct 20, 2023",
-      time: "8:00 AM",
-      rating: "-1 1764",
-      finishTime: "0:21:34",
-      solved: "2 / 4",
-      ranking: "6765 / 32562",
-      ratingClass: "text-red-500",
-    },
-    {
-      id: 5,
-      title: "Weekly Contest 419",
-      date: "Oct 13, 2023",
-      time: "8:00 AM",
-      rating: "+66 1766",
-      finishTime: "1:14:57",
-      solved: "3 / 4",
-      ranking: "1194 / 29181",
-      ratingClass: "text-green-500",
-    },
-  ]
+
 
   // Mock test questions
   const mockTest = {
@@ -830,6 +791,98 @@ export default function MockTestPage() {
     }
   }
 
+  // Fetch My Tests (Test Results)
+  const fetchMyTests = async (page = 1) => {
+    if (!user || !user.primaryEmailAddress?.emailAddress) return;
+
+    setIsLoadingMyTests(true);
+    try {
+      const response = await fetch(apiUrls.users.getTestResults(
+        user.primaryEmailAddress.emailAddress,
+        page,
+        10 // limit
+      ));
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          setMyTestsData(data.data.results.map((result: any) => ({
+            id: result.testId,
+            title: result.title,
+            date: new Date(result.submittedAt).toLocaleDateString(),
+            time: new Date(result.submittedAt).toLocaleTimeString(),
+            rating: `${result.ratingChange >= 0 ? '+' : ''}${result.ratingChange} ${result.ratingAfterTest}`,
+            finishTime: new Date(result.timeTaken * 1000).toISOString().substr(11, 8),
+            solved: `${result.questionsSolved} / ${result.totalQuestions}`,
+            ranking: result.rank ? `${result.rank} / ${result.totalParticipants}` : 'N/A',
+            ratingClass: result.ratingChange >= 0 ? "text-green-500" : "text-red-500",
+          })));
+          setMyTestsTotalPages(data.data.totalPages);
+          setMyTestsTotalCount(data.data.total);
+          setMyTestsPage(data.data.page);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching my tests:", error);
+    } finally {
+      setIsLoadingMyTests(false);
+    }
+  };
+
+  // Fetch my tests when tab is active or page changes
+  useEffect(() => {
+    if (activeTab === "my-tests" && user) {
+      fetchMyTests(myTestsPage);
+    }
+  }, [activeTab, user, myTestsPage]);
+
+  // Check admin status
+  const checkAdminStatus = async () => {
+    if (!user || !user.primaryEmailAddress?.emailAddress) {
+      setIsAdmin(false);
+      setIsCheckingAdmin(false);
+      return;
+    }
+
+    try {
+      const url = apiUrls.users.checkAdmin(user.primaryEmailAddress.emailAddress);
+
+      const response = await fetch(url);
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Handle both response formats: { success: true, is_admin: true } or { success: true, data: { is_admin: true } }
+        const isAdminValue = data.data?.is_admin || data.is_admin || false;
+
+        setIsAdmin(isAdminValue);
+      } else {
+        console.error("Failed to check admin status", response.status, response.statusText);
+        setIsAdmin(false);
+      }
+    } catch (error) {
+      console.error("Error checking admin status:", error);
+      setIsAdmin(false);
+    } finally {
+      setIsCheckingAdmin(false);
+    }
+  };
+
+  // Check admin status when user loads
+  useEffect(() => {
+    if (user) {
+      checkAdminStatus();
+    } else if (!user) { // Note: useUser().user is undefined while loading, null when signed out
+      // We might want to be careful here. If it's undefined (loading), we shouldn't necessarily set to false yet if we want to avoid flickering, 
+      // but for safety, defaulting to false is fine. 
+      // However, 'user' from useUser() is null if not signed in, undefined if loading.
+      if (user === null) {
+        setIsAdmin(false);
+        setIsCheckingAdmin(false);
+      }
+    }
+  }, [user]);
+
   // Fetch registered and submitted tests when user loads
   useEffect(() => {
     if (user) {
@@ -927,7 +980,7 @@ export default function MockTestPage() {
                         {template.duration} min
                       </Badge>
                     </div>
-                    {userRole === "admin" && (
+                    {isAdmin && (
                       <div className="mt-2">
                         <Button
                           size="sm"
@@ -1000,17 +1053,17 @@ export default function MockTestPage() {
       </Dialog>
 
       <Tabs defaultValue="upcoming-tests" className="space-y-6" onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full md:w-${userRole === "admin" ? "800px" : "600px"} grid-cols-${userRole === "admin" ? "4" : "3"}`}>
+        <TabsList className={`grid w-full md:w-${isAdmin ? "800px" : "600px"} grid-cols-${isAdmin ? "4" : "3"}`}>
           <TabsTrigger value="upcoming-tests">Upcoming Mock Tests</TabsTrigger>
           <TabsTrigger value="past-tests">Past Mock Tests</TabsTrigger>
           <TabsTrigger value="my-tests">My Mock Tests</TabsTrigger>
-          {userRole === "admin" && (
+          {isAdmin && (
             <TabsTrigger value="admin-tests">Manage Tests</TabsTrigger>
           )}
         </TabsList>
 
         {/* Admin Tab for Managing Tests - Only visible to admin users */}
-        {userRole === "admin" && (
+        {isAdmin && (
           <TabsContent value="admin-tests" className="space-y-6">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-4">
@@ -1022,7 +1075,7 @@ export default function MockTestPage() {
                   disabled={isLoadingAdminTests}
                   className="border-gray-300 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-50 transition-all"
                 >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingAdminTests ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`h - 4 w - 4 mr - 2 ${isLoadingAdminTests ? 'animate-spin' : ''} `} />
                   Refresh
                 </Button>
               </div>
@@ -1082,7 +1135,7 @@ export default function MockTestPage() {
                                 size="sm"
                                 variant="outline"
                                 className="text-xs border-blue-200 hover:bg-blue-50 hover:border-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/30"
-                                onClick={() => router.push(`/mock-test/edit/${test.id}`)}
+                                onClick={() => router.push(`/ mock - test / edit / ${test.id} `)}
                               >
                                 <Edit className="h-3 w-3 mr-1" /> Edit
                               </Button>
@@ -1143,7 +1196,7 @@ export default function MockTestPage() {
                 .map((test) => {
                   const isLive = test.timestamp && currentTime.getTime() >= test.timestamp;
                   return (
-                    <Card key={test.id} className={`takeuforward-card overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/20 relative ${isLive ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : ''}`}>
+                    <Card key={test.id} className={`takeuforward - card overflow - hidden transition - all duration - 300 hover: shadow - lg hover: border - primary / 20 relative ${isLive ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : ''} `}>
                       <div className="p-6">
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex flex-wrap gap-1">
@@ -1272,7 +1325,7 @@ export default function MockTestPage() {
                     <td className="px-4 py-4">
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline" className="text-xs" asChild>
-                          <Link href={`/mock-test/problems/${test.id}`}>
+                          <Link href={`/ mock - test / problems / ${test.id} `}>
                             Problems
                           </Link>
                         </Button>
@@ -1290,43 +1343,81 @@ export default function MockTestPage() {
 
         {/* My Mock Tests Tab */}
         <TabsContent value="my-tests" className="space-y-6">
-          <div className="overflow-hidden rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium">Contest</th>
-                  <th className="px-4 py-3 text-left font-medium">Rating</th>
-                  <th className="px-4 py-3 text-left font-medium">Finish Time</th>
-                  <th className="px-4 py-3 text-left font-medium">Solved</th>
-                  <th className="px-4 py-3 text-left font-medium">Ranking</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {myTests.map((test) => (
-                  <tr key={test.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-4">
-                      <div className="font-medium">{test.title}</div>
-                      <div className="text-xs text-muted-foreground">{test.date} {test.time}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className={test.ratingClass}>{test.rating}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div>{test.finishTime}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div>{test.solved}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div>{test.ranking}</div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {isLoadingMyTests ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : myTestsData.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">You haven't participated in any mock tests yet.</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-hidden rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium">Contest</th>
+                      <th className="px-4 py-3 text-left font-medium">Rating</th>
+                      <th className="px-4 py-3 text-left font-medium">Finish Time</th>
+                      <th className="px-4 py-3 text-left font-medium">Solved</th>
+                      <th className="px-4 py-3 text-left font-medium">Ranking</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {myTestsData.map((test) => (
+                      <tr key={test.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-4">
+                          <div className="font-medium">{test.title}</div>
+                          <div className="text-xs text-muted-foreground">{test.date} {test.time}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className={test.ratingClass}>{test.rating}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div>{test.finishTime}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div>{test.solved}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div>{test.ranking}</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Controls */}
+              {myTestsTotalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMyTestsPage(prev => Math.max(prev - 1, 1))}
+                    disabled={myTestsPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" /> Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {myTestsPage} of {myTestsTotalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMyTestsPage(prev => Math.min(prev + 1, myTestsTotalPages))}
+                    disabled={myTestsPage === myTestsTotalPages}
+                  >
+                    Next <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
         </TabsContent>
+
       </Tabs>
-    </div>
+    </div >
   );
 }
