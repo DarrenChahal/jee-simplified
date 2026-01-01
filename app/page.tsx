@@ -1,11 +1,15 @@
+"use client";
+
 import Link from "next/link"
 import Image from "next/image"
 import { ArrowRight, ChevronRight, Clock, Code, FileText, TrendingUp, Trophy, BookOpen, Zap, Brain, Lightbulb } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { SignInButton, SignUpButton } from "@clerk/nextjs"
 
 export default function Home() {
   return (
     <div className="w-full">
+
       {/* Hero Section with Animation */}
       <section className="w-full py-6 md:py-10 lg:py-16 bg-gradient-to-b from-background to-blue-50 overflow-hidden">
         <div className="leetcode-container relative">
@@ -39,11 +43,16 @@ export default function Home() {
                 Transform complex concepts into simple understanding. Our platform makes JEE preparation efficient, effective, and enjoyable.
               </p>
               <div className="flex flex-col gap-3 min-[400px]:flex-row pt-2">
-                <Button size="lg" className="takeuforward-button group transition-all duration-300 transform hover:scale-105 pulse-animation" asChild>
-                  <Link href="/signup">
+                <SignUpButton mode="modal">
+                  <Button size="lg" className="takeuforward-button group transition-all duration-300 transform hover:scale-105 pulse-animation">
                     Get Started Free <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </Link>
-                </Button>
+                  </Button>
+                </SignUpButton>
+                <SignInButton mode="modal">
+                  <Button variant="outline" size="lg">
+                    Sign In
+                  </Button>
+                </SignInButton>
               </div>
             </div>
             <div className="relative mx-auto w-full max-w-lg">
@@ -215,19 +224,11 @@ export default function Home() {
               </p>
             </div>
             <div className="flex flex-col gap-3 min-[400px]:flex-row">
-              <Button size="lg" variant="secondary" className="transition-all duration-300 transform hover:scale-105" asChild>
-                <Link href="/signup">
+              <SignUpButton mode="modal">
+                <Button size="lg" variant="secondary" className="transition-all duration-300 transform hover:scale-105">
                   Get Started for Free <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="bg-white/10 text-white hover:bg-white/20 border-white transition-all duration-300"
-                asChild
-              >
-                <Link href="/pricing">View Pricing</Link>
-              </Button>
+                </Button>
+              </SignUpButton>
             </div>
           </div>
         </div>

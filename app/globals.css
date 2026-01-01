@@ -533,3 +533,51 @@
     box-shadow: 0 0 0 0 rgba(var(--primary), 0);
   }
 }
+
+.katex-display {
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+/* Glassmorphism & Profile Page Utilities */
+.glass-card {
+  @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-lg;
+}
+
+.shadow-subtle {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+/* Subject Colors */
+.bg-jee-physics {
+  background-color: #3b82f6;
+}
+.text-jee-physics {
+  color: #3b82f6;
+}
+.from-jee-physics {
+  --tw-gradient-from: #3b82f6;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(59, 130, 246, 0));
+}
+
+.bg-jee-chemistry {
+  background-color: #10b981;
+}
+.text-jee-chemistry {
+  color: #10b981;
+}
+.via-jee-chemistry {
+  --tw-gradient-via: #10b981;
+  --tw-gradient-stops: var(--tw-gradient-from), #10b981, var(--tw-gradient-to);
+}
+
+.bg-jee-mathematics {
+  background-color: #a855f7;
+}
+.text-jee-mathematics {
+  color: #a855f7;
+}
+.to-jee-mathematics {
+  --tw-gradient-to: #a855f7;
+}
