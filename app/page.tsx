@@ -229,14 +229,6 @@ export default function Home() {
                   Get Started for Free <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </SignUpButton>
-              <Button
-                size="lg"
-                variant="outline"
-                className="bg-white/10 text-white hover:bg-white/20 border-white transition-all duration-300"
-                asChild
-              >
-                <Link href="/pricing">View Pricing</Link>
-              </Button>
             </div>
           </div>
         </div>

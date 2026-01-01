@@ -29,18 +29,42 @@ const StreakCalendar = ({ streak }: StreakCalendarProps) => {
                 </div>
             </div>
 
-            <div className="flex justify-start gap-4 items-center mb-8 px-2">
-                {streak.activity.map((day, index) => (
-                    <div key={index} className="flex flex-col items-center gap-2">
-                        <span className="text-xs text-muted-foreground font-medium">{day.day}</span>
-                        <div className={`w-7 h-7 md:w-9 md:h-9 rounded-full flex items-center justify-center transition-all ${day.active
-                            ? "bg-green-500 shadow-lg shadow-green-500/20 text-white scale-110"
-                            : "bg-gray-100 border border-transparent text-gray-400"
-                            } ${day.isToday ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-white" : ""}`}>
-                            {day.active && <Check className="w-4 h-4 md:w-5 md:h-5 stroke-[3px]" />}
+            <div className="flex justify-between gap-2 items-center mb-8 px-1">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => {
+                    // Logic to determine day status
+                    const todayDate = new Date();
+                    // Adjust to get 0 for Mon, 6 for Sun
+                    const currentDayIndex = (todayDate.getDay() + 6) % 7;
+
+                    const isFuture = index > currentDayIndex;
+                    const isToday = index === currentDayIndex;
+
+                    // Find if this day has activity in the provided data
+                    const activityForDay = streak.activity.find(a => a.day === day);
+                    const isActive = activityForDay?.active || false;
+
+                    return (
+                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
+                            <span className={`text-xs font-medium ${isFuture ? "text-gray-300" : "text-muted-foreground"}`}>
+                                {day}
+                            </span>
+
+                            <div className={`w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center transition-all duration-300
+                                ${isFuture
+                                    ? "bg-gray-50 border border-gray-100 text-gray-200" // Future style
+                                    : isActive
+                                        ? "bg-green-500 shadow-md shadow-green-500/20 text-white scale-105" // Active/Solved style
+                                        : "bg-gray-100 border border-transparent text-gray-400" // Inactive/Not Solved style
+                                }
+                                ${isToday ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-white" : ""}
+                            `}>
+                                {(!isFuture && isActive) && (
+                                    <Check className="w-4 h-4 md:w-5 md:h-5 stroke-[3px]" />
+                                )}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-6">
