@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { Clock, ChevronLeft, ChevronRight, CheckCircle, HelpCircle, Calendar, Search, Timer, Plus, Edit, Trash2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -19,9 +19,12 @@ import { Template } from "./hooks/getTemplates"
 import { toast } from "@/components/ui/use-toast"
 
 import { useUser } from "@clerk/nextjs"
+import { useServerTime } from "./hooks/useServerTime"
+import { CountdownTimer } from "./components/CountdownTimer"
 
 export default function MockTestPage() {
   const { user } = useUser()
+  const currentTime = useServerTime()
   const router = useRouter()
   const { templates, isLoading: isLoadingTemplates, deleteTemplate } = useTemplates()
   const [currentQuestion, setCurrentQuestion] = useState(0)
@@ -29,7 +32,6 @@ export default function MockTestPage() {
   const [timeRemaining, setTimeRemaining] = useState(5400) // 90 minutes in seconds
   const [isTestSubmitted, setIsTestSubmitted] = useState(false)
   const [activeTab, setActiveTab] = useState("upcoming-tests")
-  const [isTestStarted, setIsTestStarted] = useState(false)
   const [selectedTest, setSelectedTest] = useState<{
     id?: string;
     title: string;
@@ -65,8 +67,9 @@ export default function MockTestPage() {
   }[]>([])
   const [isLoadingAdminTests, setIsLoadingAdminTests] = useState(false)
 
-  // Mock user role for demonstration - this would normally come from an auth system
-  const [userRole] = useState("admin") // For testing purposes, set to "admin"
+  // Real admin check state
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true)
 
   // Add state for upcoming tests
   const [upcomingTests, setUpcomingTests] = useState<{
@@ -82,9 +85,44 @@ export default function MockTestPage() {
     time: string;
     registrations: number;
     isRegistered?: boolean;
+    timestamp?: number;
   }[]>([])
   const [isLoadingUpcomingTests, setIsLoadingUpcomingTests] = useState(false)
   const [registeredTestIds, setRegisteredTestIds] = useState<Set<string>>(new Set())
+  const [submittedTestIds, setSubmittedTestIds] = useState<Set<string>>(new Set())
+
+  // My Mock Tests State
+  const [myTestsData, setMyTestsData] = useState<{
+    id: string;
+    title: string;
+    date: string;
+    time: string;
+    rating: string;
+    finishTime: string;
+    solved: string;
+    ranking: string;
+    ratingClass: string;
+  }[]>([])
+  const [isLoadingMyTests, setIsLoadingMyTests] = useState(false)
+  const [myTestsPage, setMyTestsPage] = useState(1)
+  const [myTestsTotalPages, setMyTestsTotalPages] = useState(1)
+  const [myTestsTotalCount, setMyTestsTotalCount] = useState(0)
+
+  // Past Tests State
+  const [pastTests, setPastTests] = useState<{
+    id: string;
+    title: string;
+    description: string;
+    date: string;
+    time: string;
+    participants: number;
+    questions: number;
+    duration: number;
+    difficulty: string;
+  }[]>([])
+  const [isLoadingPastTests, setIsLoadingPastTests] = useState(false)
+  const [pastTestsPage, setPastTestsPage] = useState(1)
+  const [pastTestsTotalPages, setPastTestsTotalPages] = useState(1)
 
   // Define API test data interface
   interface APITest {
@@ -114,112 +152,9 @@ export default function MockTestPage() {
     difficulty: string;
   }
 
-  // Past mock tests data
-  const pastTests = [
-    {
-      id: '1',
-      title: "Weekly Contest 437",
-      description: "JEE Advanced level physics and mathematics problems.",
-      date: "Feb 16, 2024",
-      time: "8:00 AM",
-      participants: 30717,
-      questions: 4,
-      duration: 90, // minutes
-      difficulty: "Hard",
-    },
-    {
-      id: '2',
-      title: "Biweekly Contest 150",
-      description: "JEE Main level chemistry and physics problems.",
-      date: "Feb 15, 2024",
-      time: "8:00 PM",
-      participants: 34958,
-      questions: 4,
-      duration: 90, // minutes
-      difficulty: "Medium",
-    },
-    {
-      id: '3',
-      title: "Weekly Contest 421",
-      description: "JEE Advanced level mathematics problems.",
-      date: "Oct 27, 2023",
-      time: "8:00 AM",
-      participants: 27902,
-      questions: 4,
-      duration: 90, // minutes
-      difficulty: "Hard",
-    },
-    {
-      id: '4',
-      title: "Weekly Contest 420",
-      description: "JEE Main level physics problems.",
-      date: "Oct 20, 2023",
-      time: "8:00 AM",
-      participants: 32562,
-      questions: 4,
-      duration: 90, // minutes
-      difficulty: "Medium",
-    },
-  ]
 
-  // My mock tests data
-  const myTests = [
-    {
-      id: 1,
-      title: "Weekly Contest 437",
-      date: "Feb 16, 2024",
-      time: "8:00 AM",
-      rating: "+19 1860",
-      finishTime: "0:36:17",
-      solved: "2 / 4",
-      ranking: "2584 / 30717",
-      ratingClass: "text-green-500",
-    },
-    {
-      id: 2,
-      title: "Biweekly Contest 150",
-      date: "Feb 15, 2024",
-      time: "8:00 PM",
-      rating: "+39 1841",
-      finishTime: "0:19:30",
-      solved: "2 / 4",
-      ranking: "1654 / 34958",
-      ratingClass: "text-green-500",
-    },
-    {
-      id: 3,
-      title: "Weekly Contest 421",
-      date: "Oct 27, 2023",
-      time: "8:00 AM",
-      rating: "+36 1801",
-      finishTime: "0:40:36",
-      solved: "2 / 4",
-      ranking: "2036 / 27902",
-      ratingClass: "text-green-500",
-    },
-    {
-      id: 4,
-      title: "Weekly Contest 420",
-      date: "Oct 20, 2023",
-      time: "8:00 AM",
-      rating: "-1 1764",
-      finishTime: "0:21:34",
-      solved: "2 / 4",
-      ranking: "6765 / 32562",
-      ratingClass: "text-red-500",
-    },
-    {
-      id: 5,
-      title: "Weekly Contest 419",
-      date: "Oct 13, 2023",
-      time: "8:00 AM",
-      rating: "+66 1766",
-      finishTime: "1:14:57",
-      solved: "3 / 4",
-      ranking: "1194 / 29181",
-      ratingClass: "text-green-500",
-    },
-  ]
+
+
 
   // Mock test questions
   const mockTest = {
@@ -264,17 +199,7 @@ export default function MockTestPage() {
     ],
   }
 
-  // Timer effect
-  useEffect(() => {
-    if (timeRemaining > 0 && isTestStarted && !isTestSubmitted) {
-      const timer = setTimeout(() => {
-        setTimeRemaining(timeRemaining - 1);
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else if (timeRemaining === 0 && isTestStarted && !isTestSubmitted) {
-      handleSubmitTest();
-    }
-  }, [timeRemaining, isTestStarted, isTestSubmitted]);
+
 
   const handleAnswerSelect = (value: string) => {
     setSelectedAnswers({
@@ -317,14 +242,19 @@ export default function MockTestPage() {
     time: string;
     registrations?: number;
   }) => {
-    // Make sure we store the test data with consistent id type
-    const formattedTest = {
-      ...test,
-      id: test.id?.toString() // Convert the id to string for consistency
-    };
-    setSelectedTest(formattedTest);
-    setIsTestStarted(true);
-    setTimeRemaining(test.duration * 60); // Convert minutes to seconds
+    if (!test.id) return;
+
+    // Check if test has already been submitted
+    if (submittedTestIds.has(test.id)) {
+      toast({
+        title: "Test Already Submitted",
+        description: "You have already completed this test.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    router.push(`/mock-test/take/${test.id}`);
   };
 
   const handleTestRegistration = async (test: {
@@ -378,7 +308,7 @@ export default function MockTestPage() {
         throw new Error(data.message || `Failed with status: ${response.status}`);
       }
 
-      console.log('User registered for test:', data);
+
 
       toast({
         title: "Registration Successful",
@@ -555,7 +485,7 @@ export default function MockTestPage() {
         const success = await deleteTemplate(templateId)
         if (success) {
           // Template was deleted successfully
-          // No need to refresh - templates state is updated inside deleteTemplate function
+          // No need to refresh-templates state is updated inside deleteTemplate function
         } else {
           alert("Failed to delete template. Please try again.")
         }
@@ -697,51 +627,77 @@ export default function MockTestPage() {
     }
   }
 
-  // Function to fetch upcoming (scheduled) tests
+  // Function to fetch upcoming (scheduled and live) tests
   const fetchUpcomingTests = async () => {
     setIsLoadingUpcomingTests(true)
     try {
-      const response = await fetch(`${apiUrls.tests.getAll}?status=scheduled`)
+      // Fetch both scheduled and live tests in parallel
+      const [scheduledResponse, liveResponse] = await Promise.all([
+        fetch(`${apiUrls.tests.getAll}?status=scheduled`),
+        fetch(`${apiUrls.tests.getAll}?status=live`)
+      ]);
 
-      if (!response.ok) {
-        console.error('Failed to fetch upcoming tests:', response.status)
-        return
-      }
+      const testMap = new Map();
 
-      const data = await response.json()
-
-      if (data.success && data.data && data.data.documents) {
-        const formattedTests = data.data.documents.map((test: APITest) => {
-          // Convert timestamp to readable date and time
-          const testDate = new Date(test.test_date)
-          const formattedDate = testDate.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-          })
-          const formattedTime = testDate.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          })
-
-          return {
-            id: test._id,
-            title: test.title,
-            description: test.description,
-            subject: Array.isArray(test.subjects) ? test.subjects[0] : (test.subject || "General"),
-            subjects: Array.isArray(test.subjects) ? test.subjects : [test.subject || "General"],
-            questions: test.questions,
-            duration: test.test_duration,
-            difficulty: test.difficulty,
-            date: formattedDate,
-            time: formattedTime,
-            registrations: test.registered_count
+      // Helper to process tests and add to map
+      const processTests = async (response: Response, source: string) => {
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data && Array.isArray(data.data.documents)) {
+            data.data.documents.forEach((test: any) => {
+              // Use _id as key to deduplicate
+              if (test._id && !testMap.has(test._id)) {
+                testMap.set(test._id, test);
+              }
+            });
           }
+        } else {
+          console.error(`Failed to fetch ${source} tests (status: ${response.status})`);
+        }
+      };
+
+      await Promise.all([
+        processTests(scheduledResponse, 'scheduled'),
+        processTests(liveResponse, 'live')
+      ]);
+
+      const allTests = Array.from(testMap.values());
+
+      const formattedTests = allTests.map((test: APITest) => {
+        // Convert timestamp to readable date and time
+        const testDate = new Date(test.test_date)
+        const formattedDate = testDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        })
+        const formattedTime = testDate.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
         })
 
-        setUpcomingTests(formattedTests)
-      }
+        return {
+          id: test._id,
+          title: test.title,
+          description: test.description,
+          subject: Array.isArray(test.subjects) ? test.subjects[0] : (test.subject || "General"),
+          subjects: Array.isArray(test.subjects) ? test.subjects : [test.subject || "General"],
+          questions: test.questions || 0,
+          duration: test.test_duration || test.duration || 90,
+          difficulty: test.difficulty || "Medium",
+          date: formattedDate,
+          time: formattedTime,
+          registrations: test.registered_count || 0,
+          timestamp: test.test_date
+        }
+      })
+
+      // Sort by timestamp (nearest first)
+      formattedTests.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+      setUpcomingTests(formattedTests)
+
     } catch (error) {
       console.error('Error fetching upcoming tests:', error)
     } finally {
@@ -754,13 +710,13 @@ export default function MockTestPage() {
     if (!user || !user.primaryEmailAddress?.emailAddress) return;
 
     try {
-      console.log("Fetching registered tests for:", user.primaryEmailAddress.emailAddress);
+
       const response = await fetch(apiUrls.users.getRegisteredTests(user.primaryEmailAddress.emailAddress));
 
       if (!response.ok) return;
 
       const data = await response.json();
-      console.log("Registered tests response:", data);
+
 
       if (data.success && data.data) {
         const ids = new Set<string>(data.data.map((reg: any) => reg.test_id || reg._id));
@@ -771,12 +727,214 @@ export default function MockTestPage() {
     }
   }
 
-  // Fetch registered tests when user loads
+  // Fetch submitted tests for the user
+  const fetchSubmittedTests = async () => {
+    if (!user || !user.primaryEmailAddress?.emailAddress) return;
+
+    try {
+
+
+      // Get all upcoming test IDs to send to backend
+      const testIds = upcomingTests.map(test => test.id);
+
+      if (testIds.length === 0) return; // No tests to check
+
+      const response = await fetch(apiUrls.users.getSubmittedTests, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_email: user.primaryEmailAddress.emailAddress,
+          test_ids: testIds
+        })
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+
+
+      if (data.success && data.data) {
+        // data.data should be an array of test IDs that user has submitted
+        const ids = new Set<string>(data.data);
+        setSubmittedTestIds(ids);
+      }
+    } catch (error) {
+      console.error('Error fetching submitted tests:', error);
+    }
+  }
+
+  // Fetch My Tests (Test Results)
+  const fetchMyTests = async (page = 1) => {
+    if (!user || !user.primaryEmailAddress?.emailAddress) return;
+
+    setIsLoadingMyTests(true);
+    try {
+      const response = await fetch(apiUrls.users.getTestResults(
+        user.primaryEmailAddress.emailAddress,
+        page,
+        10 // limit
+      ));
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          setMyTestsData(data.data.results.map((result: any) => ({
+            id: result.testId,
+            title: result.title,
+            date: new Date(result.submittedAt).toLocaleDateString(),
+            time: new Date(result.submittedAt).toLocaleTimeString(),
+            rating: `${result.ratingChange >= 0 ? '+' : ''}${result.ratingChange} ${result.ratingAfterTest}`,
+            finishTime: new Date(result.timeTaken * 1000).toISOString().substr(11, 8),
+            solved: `${result.questionsSolved}/${result.totalQuestions}`,
+            ranking: result.rank ? `${result.rank}/${result.totalParticipants}` : 'N/A',
+            ratingClass: result.ratingChange >= 0 ? "text-green-500" : "text-red-500",
+          })));
+          setMyTestsTotalPages(data.data.totalPages);
+          setMyTestsTotalCount(data.data.total);
+          setMyTestsPage(data.data.page);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching my tests:", error);
+    } finally {
+      setIsLoadingMyTests(false);
+    }
+  };
+
+  // Fetch Past Tests
+  const fetchPastTests = async (page = 1) => {
+    setIsLoadingPastTests(true);
+    try {
+      const limit = 10;
+      const url = `${apiUrls.tests.getAll}?status=complete&page=${page}&limit=${limit}`;
+      console.log('[Past Tests] Fetching from:', url);
+
+      const response = await fetch(url);
+      console.log('[Past Tests] Response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[Past Tests] Response data:', data);
+
+        if (data.success && data.data && Array.isArray(data.data.documents)) {
+          console.log('[Past Tests] Found tests:', data.data.documents.length);
+          const formattedTests = data.data.documents.map((test: any) => {
+            const testDate = new Date(test.test_date)
+            return {
+              id: test._id,
+              title: test.title,
+              description: test.description,
+              date: testDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+              }),
+              time: testDate.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              }),
+              participants: test.registered_count || 0,
+              questions: test.questions || 0,
+              duration: test.test_duration || test.duration || 90,
+              difficulty: test.difficulty || "Medium"
+            }
+          });
+
+          console.log('[Past Tests] Formatted tests:', formattedTests);
+          setPastTests(formattedTests);
+          if (data.data.totalPages) {
+            setPastTestsTotalPages(data.data.totalPages);
+          }
+        } else {
+          console.log('[Past Tests] No data found or invalid format');
+        }
+      } else {
+        console.error('[Past Tests] Response not OK:', response.status);
+      }
+    } catch (error) {
+      console.error("[Past Tests] Error fetching past tests:", error);
+    } finally {
+      setIsLoadingPastTests(false);
+    }
+  };
+
+  // Fetch past tests when tab is active or page changes
+  useEffect(() => {
+    if (activeTab === "past-tests") {
+      fetchPastTests(pastTestsPage);
+    }
+  }, [activeTab, pastTestsPage]);
+
+  // Fetch my tests when tab is active or page changes
+  useEffect(() => {
+    if (activeTab === "my-tests" && user) {
+      fetchMyTests(myTestsPage);
+    }
+  }, [activeTab, user, myTestsPage]);
+
+  // Check admin status
+  const checkAdminStatus = async () => {
+    if (!user || !user.primaryEmailAddress?.emailAddress) {
+      setIsAdmin(false);
+      setIsCheckingAdmin(false);
+      return;
+    }
+
+    try {
+      const url = apiUrls.users.checkAdmin(user.primaryEmailAddress.emailAddress);
+
+      const response = await fetch(url);
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Handle both response formats: { success: true, is_admin: true } or { success: true, data: { is_admin: true } }
+        const isAdminValue = data.data?.is_admin || data.is_admin || false;
+
+        setIsAdmin(isAdminValue);
+      } else {
+        console.error("Failed to check admin status", response.status, response.statusText);
+        setIsAdmin(false);
+      }
+    } catch (error) {
+      console.error("Error checking admin status:", error);
+      setIsAdmin(false);
+    } finally {
+      setIsCheckingAdmin(false);
+    }
+  };
+
+  // Check admin status when user loads
+  useEffect(() => {
+    if (user) {
+      checkAdminStatus();
+    } else if (!user) { // Note: useUser().user is undefined while loading, null when signed out
+      // We might want to be careful here. If it's undefined (loading), we shouldn't necessarily set to false yet if we want to avoid flickering, 
+      // but for safety, defaulting to false is fine. 
+      // However, 'user' from useUser() is null if not signed in, undefined if loading.
+      if (user === null) {
+        setIsAdmin(false);
+        setIsCheckingAdmin(false);
+      }
+    }
+  }, [user]);
+
+  // Fetch registered and submitted tests when user loads
   useEffect(() => {
     if (user) {
       fetchRegisteredTests();
     }
   }, [user]);
+
+  // Fetch submitted tests when upcomingTests are loaded
+  useEffect(() => {
+    if (user && upcomingTests.length > 0) {
+      fetchSubmittedTests();
+    }
+  }, [user, upcomingTests]);
 
   // Fetch upcoming tests when component mounts and when tab changes to upcoming-tests
   useEffect(() => {
@@ -785,120 +943,40 @@ export default function MockTestPage() {
     }
   }, [activeTab])
 
-  if (isTestStarted) {
-    return (
-      <div className="min-h-screen bg-background">
-        <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-14 items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => setIsTestStarted(false)}>
-                <ChevronLeft className="h-4 w-4 mr-1" /> Exit Test
-              </Button>
-              <span className="font-medium">{selectedTest?.title}</span>
-            </div>
-            <div className={getTimerClass()}>
-              <Clock className="h-5 w-5 mr-2" />
-              <span className="font-medium">{formatTime(timeRemaining)}</span>
-            </div>
-          </div>
-        </header>
+  // Memoize visible upcoming tests to prevent infinite re-renders
+  // We only recalculate when upcomingTests changes, not when currentTime updates
+  const visibleUpcomingTests = useMemo(() => {
+    // Capture current time ONCE at the start of filtering
+    const now = Date.now();
 
-        <main className="container py-6">
-          <div className="mb-6">
-            <div className="flex items-center justify-between mt-2">
-              <div className="text-sm text-muted-foreground">
-                {Object.keys(selectedAnswers).length} of {mockTest.totalQuestions} questions answered
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Time remaining: {Math.floor(timeRemaining / 60)} minutes
-              </div>
-            </div>
-            <div className="progress-bar mt-2">
-              <div className="progress-bar-fill" style={{ width: `${progressPercentage}%` }}></div>
-            </div>
-          </div>
+    const filtered = upcomingTests.filter((test) => {
+      // Filter out expired tests (where current time > test start time + duration)
+      if (!test.timestamp || !test.duration) {
+        return true;
+      }
 
-          <div className="grid md:grid-cols-[300px_1fr] gap-6">
-            {/* Question Navigator */}
-            <Card className="takeuforward-card p-4 h-fit">
-              <h2 className="font-medium mb-4">Question Navigator</h2>
-              <div className="grid grid-cols-5 gap-2 mb-6">
-                {Array.from({ length: mockTest.totalQuestions }).map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleJumpToQuestion(index)}
-                    className={`flex items-center justify-center h-10 w-10 rounded-md text-sm font-medium transition-colors ${getQuestionStatus(index) === "current"
-                      ? "bg-primary text-primary-foreground"
-                      : getQuestionStatus(index) === "answered"
-                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                        : "bg-muted hover:bg-muted/80"
-                      }`}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="flex items-center gap-1">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>{Object.keys(selectedAnswers).length} Answered</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="flex items-center gap-1">
-                    <HelpCircle className="h-4 w-4 text-primary" />
-                    <span>{mockTest.totalQuestions - Object.keys(selectedAnswers).length} Unanswered</span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-6">
-                <Button className="w-full takeuforward-button" onClick={handleSubmitTest}>
-                  Submit Test
-                </Button>
-              </div>
-            </Card>
+      // Ensure we're working with numbers
+      const timestamp = Number(test.timestamp);
+      const duration = Number(test.duration);
 
-            {/* Question Content */}
-            <Card className="takeuforward-card p-6">
-              <div className="space-y-6">
-                <div>
-                  <div className="text-sm text-muted-foreground mb-2">
-                    Question {currentQuestion + 1} of {mockTest.totalQuestions}
-                  </div>
-                  <h3 className="text-xl font-medium">{mockTest.questions[currentQuestion].text}</h3>
-                </div>
+      if (isNaN(timestamp) || isNaN(duration)) {
+        return true;
+      }
 
-                <RadioGroup
-                  value={selectedAnswers[currentQuestion] || ""}
-                  onValueChange={handleAnswerSelect}
-                  className="space-y-4"
-                >
-                  {mockTest.questions[currentQuestion].options.map((option) => (
-                    <div key={option.id} className="test-option flex items-center space-x-2 rounded-md border p-3 hover:bg-muted/50">
-                      <RadioGroupItem value={option.id} id={`option-${option.id}`} />
-                      <Label htmlFor={`option-${option.id}`} className="flex-1 cursor-pointer">
-                        {option.text}
-                      </Label>
-                    </div>
-                  ))}
-                </RadioGroup>
+      const testEndTime = timestamp + (duration * 60 * 1000);
+      return now < testEndTime;
+    });
 
-                <div className="flex items-center justify-between pt-4 border-t">
-                  <Button variant="outline" onClick={handlePreviousQuestion} disabled={currentQuestion === 0}>
-                    <ChevronLeft className="mr-2 h-4 w-4" /> Previous
-                  </Button>
-                  <Button onClick={handleNextQuestion} disabled={currentQuestion === mockTest.questions.length - 1}>
-                    Next <ChevronRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </main>
-      </div>
-    );
-  }
+    return filtered;
+  }, [upcomingTests]); // Only depend on upcomingTests, NOT currentTime
+
+  // console.log('[Render] ===== RENDER PHASE =====');
+  // console.log('[Render] isLoadingUpcomingTests:', isLoadingUpcomingTests);
+  // console.log('[Render] upcomingTests.length:', upcomingTests.length);
+  // console.log('[Render] visibleUpcomingTests.length:', visibleUpcomingTests.length);
+  // console.log('[Render] visibleUpcomingTests:', visibleUpcomingTests);
+
+
 
   return (
     <div className="leetcode-container py-8">
@@ -974,7 +1052,7 @@ export default function MockTestPage() {
                         {template.duration} min
                       </Badge>
                     </div>
-                    {userRole === "admin" && (
+                    {isAdmin && (
                       <div className="mt-2">
                         <Button
                           size="sm"
@@ -1047,17 +1125,17 @@ export default function MockTestPage() {
       </Dialog>
 
       <Tabs defaultValue="upcoming-tests" className="space-y-6" onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full md:w-${userRole === "admin" ? "800px" : "600px"} grid-cols-${userRole === "admin" ? "4" : "3"}`}>
+        <TabsList className={`grid w-full md:w-${isAdmin ? "800px" : "600px"} grid-cols-${isAdmin ? "4" : "3"}`}>
           <TabsTrigger value="upcoming-tests">Upcoming Mock Tests</TabsTrigger>
           <TabsTrigger value="past-tests">Past Mock Tests</TabsTrigger>
           <TabsTrigger value="my-tests">My Mock Tests</TabsTrigger>
-          {userRole === "admin" && (
+          {isAdmin && (
             <TabsTrigger value="admin-tests">Manage Tests</TabsTrigger>
           )}
         </TabsList>
 
-        {/* Admin Tab for Managing Tests - Only visible to admin users */}
-        {userRole === "admin" && (
+        {/* Admin Tab for Managing Tests-Only visible to admin users */}
+        {isAdmin && (
           <TabsContent value="admin-tests" className="space-y-6">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-4">
@@ -1069,7 +1147,7 @@ export default function MockTestPage() {
                   disabled={isLoadingAdminTests}
                   className="border-gray-300 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-50 transition-all"
                 >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingAdminTests ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingAdminTests ? 'animate-spin' : ''} `} />
                   Refresh
                 </Button>
               </div>
@@ -1174,171 +1252,270 @@ export default function MockTestPage() {
             <div className="flex justify-center items-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
-          ) : upcomingTests.length === 0 ? (
+          ) : visibleUpcomingTests.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground">No upcoming tests are scheduled at the moment.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {upcomingTests.map((test) => (
-                <Card key={test.id} className="takeuforward-card overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/20">
-                  <div className="p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex flex-wrap gap-1">
-                        {test.subjects?.map((subj: string, idx: number) => (
-                          <Badge key={idx} className="bg-primary/80 text-primary-foreground">{subj}</Badge>
-                        ))}
-                      </div>
-                      <Badge variant="outline" className={
-                        test.difficulty === "Hard" ? "border-red-500 text-red-500" :
-                          test.difficulty === "Medium" ? "border-amber-500 text-amber-500" :
-                            "border-green-500 text-green-500"
-                      }>
-                        {test.difficulty}
-                      </Badge>
-                    </div>
-                    <h3 className="text-xl font-bold mb-2">{test.title}</h3>
-                    <p className="text-muted-foreground text-sm mb-4">{test.description}</p>
-                    <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
-                      <div className="flex items-center">
-                        <Calendar className="h-4 w-4 mr-1" />
-                        <span>{test.date}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Clock className="h-4 w-4 mr-1" />
-                        <span>{test.time}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-muted-foreground mb-6">
-                      <div className="flex items-center">
-                        <HelpCircle className="h-4 w-4 mr-1" />
-                        <span>{test.questions} Questions</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Timer className="h-4 w-4 mr-1" />
-                        <span>{test.duration} Minutes</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs text-muted-foreground">
-                        <span className="font-medium text-primary">{test.registrations}</span> registrations
-                      </div>
-                      <div className="flex gap-2">
-                        {registeredTestIds.has(test.id) ? (
-                          <>
-                            <Button className="takeuforward-button bg-green-600 hover:bg-green-700" disabled>
-                              Registered
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 dark:border-red-800 dark:hover:bg-red-900/30"
-                              onClick={() => handleTestUnregistration(test)}
-                            >
-                              Unregister
-                            </Button>
-                          </>
-                        ) : (
-                          <Button className="takeuforward-button" onClick={() => handleTestRegistration(test)}>
-                            Register
-                          </Button>
+              {visibleUpcomingTests.map((test) => {
+                const isLive = test.timestamp && currentTime.getTime() >= test.timestamp;
+                return (
+                  <Card key={test.id} className={`takeuforward-card overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/20 relative ${isLive ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : ''}`}>
+                    <div className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex flex-wrap gap-1">
+                          {test.subjects?.map((subj: string, idx: number) => (
+                            <Badge key={idx} className="bg-primary/80 text-primary-foreground">{subj}</Badge>
+                          ))}
+                        </div>
+                        <Badge variant="outline" className={
+                          test.difficulty === "Hard" ? "border-red-500 text-red-500" :
+                            test.difficulty === "Medium" ? "border-amber-500 text-amber-500" :
+                              "border-green-500 text-green-500"
+                        }>
+                          {test.difficulty}
+                        </Badge>
+                        {isLive && (
+                          <div className="flex items-center gap-1.5 bg-red-100 dark:bg-red-900/30 px-2 py-0.5 rounded-full border border-red-200 dark:border-red-800">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                            </span>
+                            <span className="text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wider">Live</span>
+                          </div>
                         )}
                       </div>
+                      {test.timestamp && (
+                        <div className="mb-3">
+                          <CountdownTimer targetDate={test.timestamp} currentTime={currentTime} />
+                        </div>
+                      )}
+                      <h3 className="text-xl font-bold mb-2">{test.title}</h3>
+                      <p className="text-muted-foreground text-sm mb-4">{test.description}</p>
+                      <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+                        <div className="flex items-center">
+                          <Calendar className="h-4 w-4 mr-1" />
+                          <span>{test.date}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <Clock className="h-4 w-4 mr-1" />
+                          <span>{test.time}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-muted-foreground mb-6">
+                        <div className="flex items-center">
+                          <HelpCircle className="h-4 w-4 mr-1" />
+                          <span>{test.questions} Questions</span>
+                        </div>
+                        <div className="flex items-center">
+                          <Timer className="h-4 w-4 mr-1" />
+                          <span>{test.duration} Minutes</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium text-primary">{test.registrations}</span> registrations
+                        </div>
+                        <div className="flex gap-2">
+                          {submittedTestIds.has(test.id) ? (
+                            <Button className="takeuforward-button bg-gray-500 hover:bg-gray-600" disabled>
+                              Submitted
+                            </Button>
+                          ) : registeredTestIds.has(test.id) ? (
+                            test.timestamp && currentTime.getTime() >= test.timestamp ? (
+                              <Button className="takeuforward-button bg-green-600 hover:bg-green-700" onClick={() => handleStartTest(test)}>
+                                Start Test
+                              </Button>
+                            ) : (
+                              <>
+                                <Button className="takeuforward-button bg-green-600 hover:bg-green-700" disabled>
+                                  Registered
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  className="border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 dark:border-red-800 dark:hover:bg-red-900/30"
+                                  onClick={() => handleTestUnregistration(test)}
+                                >
+                                  Unregister
+                                </Button>
+                              </>
+                            )
+                          ) : (
+                            <Button className="takeuforward-button" onClick={() => handleTestRegistration(test)}>
+                              Register
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>
 
         {/* Past Mock Tests Tab */}
         <TabsContent value="past-tests" className="space-y-6">
-          <div className="overflow-hidden rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium">Contest</th>
-                  <th className="px-4 py-3 text-left font-medium">Date</th>
-                  <th className="px-4 py-3 text-left font-medium">Questions</th>
-                  <th className="px-4 py-3 text-left font-medium">Participants</th>
-                  <th className="px-4 py-3 text-left font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {pastTests.map((test) => (
-                  <tr key={test.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-4">
-                      <div className="font-medium">{test.title}</div>
-                      <div className="text-xs text-muted-foreground">{test.description}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div>{test.date}</div>
-                      <div className="text-xs text-muted-foreground">{test.time}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div>{test.questions}</div>
-                      <div className="text-xs text-muted-foreground">{test.duration} min</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div>{test.participants.toLocaleString()}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="text-xs" asChild>
-                          <Link href={`/mock-test/problems/${test.id}`}>
-                            Problems
-                          </Link>
-                        </Button>
-                        <Button size="sm" className="takeuforward-button text-xs" onClick={() => handleStartPastTest(test)}>
-                          Take Virtually
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {isLoadingPastTests ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : pastTests.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No past mock tests available.</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-hidden rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium">Contest</th>
+                      <th className="px-4 py-3 text-left font-medium">Date</th>
+                      <th className="px-4 py-3 text-left font-medium">Questions</th>
+                      <th className="px-4 py-3 text-left font-medium">Participants</th>
+                      <th className="px-4 py-3 text-left font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {pastTests.map((test) => (
+                      <tr key={test.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-4">
+                          <div className="font-medium">{test.title}</div>
+                          <div className="text-xs text-muted-foreground">{test.description}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div>{test.date}</div>
+                          <div className="text-xs text-muted-foreground">{test.time}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div>{test.questions}</div>
+                          <div className="text-xs text-muted-foreground">{test.duration} min</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div>{test.participants.toLocaleString()}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" className="text-xs" asChild>
+                              <Link href={`/mock-test/view-problems/${test.id}`}>
+                                View Problems
+                              </Link>
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Past Tests Pagination Controls */}
+              {pastTestsTotalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPastTestsPage(prev => Math.max(prev - 1, 1))}
+                    disabled={pastTestsPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" /> Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {pastTestsPage} of {pastTestsTotalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPastTestsPage(prev => Math.min(prev + 1, pastTestsTotalPages))}
+                    disabled={pastTestsPage === pastTestsTotalPages}
+                  >
+                    Next <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
         </TabsContent>
 
         {/* My Mock Tests Tab */}
         <TabsContent value="my-tests" className="space-y-6">
-          <div className="overflow-hidden rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium">Contest</th>
-                  <th className="px-4 py-3 text-left font-medium">Rating</th>
-                  <th className="px-4 py-3 text-left font-medium">Finish Time</th>
-                  <th className="px-4 py-3 text-left font-medium">Solved</th>
-                  <th className="px-4 py-3 text-left font-medium">Ranking</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {myTests.map((test) => (
-                  <tr key={test.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-4">
-                      <div className="font-medium">{test.title}</div>
-                      <div className="text-xs text-muted-foreground">{test.date} {test.time}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className={test.ratingClass}>{test.rating}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div>{test.finishTime}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div>{test.solved}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div>{test.ranking}</div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {isLoadingMyTests ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : myTestsData.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">You haven't participated in any mock tests yet.</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-hidden rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium">Contest</th>
+                      <th className="px-4 py-3 text-left font-medium">Rating</th>
+                      <th className="px-4 py-3 text-left font-medium">Finish Time</th>
+                      <th className="px-4 py-3 text-left font-medium">Solved</th>
+                      <th className="px-4 py-3 text-left font-medium">Ranking</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {myTestsData.map((test) => (
+                      <tr key={test.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-4">
+                          <div className="font-medium">{test.title}</div>
+                          <div className="text-xs text-muted-foreground">{test.date} {test.time}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className={test.ratingClass}>{test.rating}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div>{test.finishTime}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div>{test.solved}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div>{test.ranking}</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Controls */}
+              {myTestsTotalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMyTestsPage(prev => Math.max(prev - 1, 1))}
+                    disabled={myTestsPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" /> Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {myTestsPage} of {myTestsTotalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMyTestsPage(prev => Math.min(prev + 1, myTestsTotalPages))}
+                    disabled={myTestsPage === myTestsTotalPages}
+                  >
+                    Next <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
         </TabsContent>
+
       </Tabs>
     </div>
   );

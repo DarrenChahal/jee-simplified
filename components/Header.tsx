@@ -16,7 +16,7 @@ export default function Header() {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const pathname = usePathname();
-    const { isSignedIn } = useUser();
+    const { isSignedIn, user } = useUser();
 
     useEffect(() => {
         const handleScroll = () => {
@@ -47,8 +47,8 @@ export default function Header() {
                     <Link
                         href="/problems"
                         className={`px-4 py-2 text-sm font-medium transition-colors relative border-b-2 ${pathname === "/problems"
-                                ? "text-primary border-primary"
-                                : "border-transparent hover:text-primary hover:border-primary"
+                            ? "text-primary border-primary"
+                            : "border-transparent hover:text-primary hover:border-primary"
                             }`}
                     >
                         Problems
@@ -56,8 +56,8 @@ export default function Header() {
                     <Link
                         href="/mock-test"
                         className={`px-4 py-2 text-sm font-medium transition-colors relative border-b-2 ${pathname === "/mock-test"
-                                ? "text-primary border-primary"
-                                : "border-transparent hover:text-primary hover:border-primary"
+                            ? "text-primary border-primary"
+                            : "border-transparent hover:text-primary hover:border-primary"
                             }`}
                     >
                         Mock Tests
@@ -65,8 +65,8 @@ export default function Header() {
                     <Link
                         href="/previous-years"
                         className={`px-4 py-2 text-sm font-medium transition-colors relative border-b-2 ${pathname === "/previous-years"
-                                ? "text-primary border-primary"
-                                : "border-transparent hover:text-primary hover:border-primary"
+                            ? "text-primary border-primary"
+                            : "border-transparent hover:text-primary hover:border-primary"
                             }`}
                     >
                         Previous Years
@@ -74,8 +74,8 @@ export default function Header() {
                     <Link
                         href="/analytics"
                         className={`px-4 py-2 text-sm font-medium transition-colors relative border-b-2 ${pathname === "/analytics"
-                                ? "text-primary border-primary"
-                                : "border-transparent hover:text-primary hover:border-primary"
+                            ? "text-primary border-primary"
+                            : "border-transparent hover:text-primary hover:border-primary"
                             }`}
                     >
                         Analytics
@@ -83,12 +83,23 @@ export default function Header() {
                     <Link
                         href="/leaderboard"
                         className={`px-4 py-2 text-sm font-medium transition-colors relative border-b-2 ${pathname === "/leaderboard"
-                                ? "text-primary border-primary"
-                                : "border-transparent hover:text-primary hover:border-primary"
+                            ? "text-primary border-primary"
+                            : "border-transparent hover:text-primary hover:border-primary"
                             }`}
                     >
                         Leaderboard
                     </Link>
+                    {isSignedIn && (
+                        <Link
+                            href={`/profile/${user?.primaryEmailAddress?.emailAddress}`}
+                            className={`px-4 py-2 text-sm font-medium transition-colors relative border-b-2 ${pathname.startsWith("/profile")
+                                ? "text-primary border-primary"
+                                : "border-transparent hover:text-primary hover:border-primary"
+                                }`}
+                        >
+                            Profile
+                        </Link>
+                    )}
                 </nav>
 
                 {/* Desktop Auth Buttons */}
@@ -163,6 +174,16 @@ export default function Header() {
                         >
                             Leaderboard
                         </Link>
+                        {isSignedIn && (
+                            <Link
+                                href={`/profile/${user?.primaryEmailAddress?.emailAddress}`}
+                                className={`block px-4 py-2 text-sm font-medium rounded-md ${pathname.startsWith("/profile") ? "bg-primary/10 text-primary" : "hover:bg-gray-50"
+                                    }`}
+                                onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                                Profile
+                            </Link>
+                        )}
 
                         <div className="pt-2 border-t flex flex-col gap-2">
                             {!isSignedIn && (

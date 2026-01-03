@@ -7,9 +7,13 @@ const API_URL = apiUrls.tests.getAll;
 //const API_URL = 'http://localhost:8080/api/tests';
 const useMock = false;
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const response = await fetch(API_URL, {
+    const { searchParams } = new URL(request.url);
+    const queryString = searchParams.toString();
+    const url = queryString ? `${API_URL}?${queryString}` : API_URL;
+
+    const response = await fetch(url, {
       cache: 'no-store'
     });
 
