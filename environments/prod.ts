@@ -1,5 +1,5 @@
-const BASE_API_URL = "https://jee-simplified-api-274150960347.us-central1.run.app/api";
-//const BASE_API_URL = "http://localhost:5000/api";
+// const BASE_API_URL = "https://jee-simplified-api-274150960347.us-central1.run.app/api";
+const BASE_API_URL = "http://localhost:5000/api";
 
 export const apiUrls = {
   tests: {
@@ -23,9 +23,10 @@ export const apiUrls = {
     submitTest: `${BASE_API_URL}/users/test-submission/`,
     getRegisteredTests: (email: string) => `${BASE_API_URL}/users/registrations/${email}`,
     getSubmittedTests: `${BASE_API_URL}/users/submitted-tests/`,
-    getDashboard: (email: string) => `${BASE_API_URL}/users/${email}/dashboard`,
+    getDashboard: (email: string) => `${BASE_API_URL}/analytics/dashboard?email=${email}`,
     getTestResults: (email: string, page: number = 1, limit: number = 10) => `${BASE_API_URL}/users/test-results/${email}?page=${page}&limit=${limit}`,
     checkAdmin: (email: string) => `${BASE_API_URL}/users/check-admin?email=${email}`,
+    getTestAnalytics: (testId: string, email: string) => `${BASE_API_URL}/analytics/test/${testId}?email=${email}`,
   },
   templates: {
     getAll: `${BASE_API_URL}/templates`,
