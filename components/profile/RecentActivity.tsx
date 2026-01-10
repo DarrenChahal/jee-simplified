@@ -23,21 +23,21 @@ const ActivityIcon = ({ type, result }: { type: ActivityItem['type'], result?: A
     if (result === 'incorrect') return <CircleAlert className="w-5 h-5 text-red-500" />;
     return <CircleAlert className="w-5 h-5 text-amber-500" />;
   }
-
+  
   if (type === 'test') return <CalendarDays className="w-5 h-5 text-blue-500" />;
-
+  
   return <Clock className="w-5 h-5 text-gray-400" />;
 };
 
 const DifficultyBadge = ({ difficulty }: { difficulty: ActivityItem['difficulty'] }) => {
   if (!difficulty) return null;
-
+  
   const classes = {
     easy: "bg-jee-easy/10 text-jee-easy border-jee-easy/20",
     medium: "bg-jee-medium/10 text-jee-medium border-jee-medium/20",
     hard: "bg-jee-hard/10 text-jee-hard border-jee-hard/20",
   };
-
+  
   return (
     <Badge variant="outline" className={cn("text-xs px-1.5 py-0", classes[difficulty])}>
       {difficulty}
@@ -47,13 +47,13 @@ const DifficultyBadge = ({ difficulty }: { difficulty: ActivityItem['difficulty'
 
 const SubjectBadge = ({ subject }: { subject: ActivityItem['subject'] }) => {
   if (!subject) return null;
-
+  
   const classes = {
     physics: "bg-jee-physics/10 text-jee-physics border-jee-physics/20",
     chemistry: "bg-jee-chemistry/10 text-jee-chemistry border-jee-chemistry/20",
     mathematics: "bg-jee-mathematics/10 text-jee-mathematics border-jee-mathematics/20",
   };
-
+  
   return (
     <Badge variant="outline" className={cn("text-xs px-1.5 py-0", classes[subject])}>
       {subject}
@@ -90,24 +90,55 @@ const ActivityItem = ({ item }: { item: ActivityItem }) => {
   );
 };
 
-import Link from "next/link";
-
-interface RecentActivityProps {
-  activities?: ActivityItem[];
-}
-
-const RecentActivity = ({ activities = [] }: RecentActivityProps) => {
-  // If no activities provided, show empty state or fallback
-  if (activities.length === 0) {
-    return (
-      <Card className="hover:shadow-hover transition-all duration-300">
-        <CardHeader>
-          <CardTitle className="text-lg">Recent Activity</CardTitle>
-          <CardDescription>No recent tests found.</CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
+const RecentActivity = () => {
+  const activities: ActivityItem[] = [
+    {
+      id: 1,
+      type: 'question',
+      title: 'Rotational Dynamics Problem',
+      description: 'Solved a problem related to angular momentum conservation',
+      time: '2 hours ago',
+      subject: 'physics',
+      difficulty: 'hard',
+      result: 'correct',
+    },
+    {
+      id: 2,
+      type: 'test',
+      title: 'Full Mock Test 12',
+      description: 'Completed a full JEE mock test with all subjects',
+      time: '1 day ago',
+      score: '245/300',
+    },
+    {
+      id: 3,
+      type: 'question',
+      title: 'Organic Chemistry Reaction',
+      description: 'Attempted a problem on reaction mechanisms',
+      time: '1 day ago',
+      subject: 'chemistry',
+      difficulty: 'medium',
+      result: 'incorrect',
+    },
+    {
+      id: 5,
+      type: 'question',
+      title: 'Integral Calculus',
+      description: 'Solved a problem involving definite integrals',
+      time: '3 days ago',
+      subject: 'mathematics',
+      difficulty: 'hard',
+      result: 'correct',
+    },
+    {
+      id: 6,
+      type: 'test',
+      title: 'Physics Sectional Test',
+      description: 'Completed a test focused on Mechanics and Thermodynamics',
+      time: '4 days ago',
+      score: '87/100',
+    },
+  ];
 
   return (
     <Card className="hover:shadow-hover transition-all duration-300">
@@ -119,31 +150,30 @@ const RecentActivity = ({ activities = [] }: RecentActivityProps) => {
         <Tabs defaultValue="all" className="w-full">
           <TabsList className="mb-4 bg-muted/50">
             <TabsTrigger value="all" className="text-xs">All Activity</TabsTrigger>
+            <TabsTrigger value="questions" className="text-xs">Questions</TabsTrigger>
             <TabsTrigger value="tests" className="text-xs">Tests</TabsTrigger>
           </TabsList>
-
+          
           <TabsContent value="all" className="mt-0 pt-0">
             <div className="space-y-1">
               {activities.map((activity) => (
-                <div key={activity.id}>
-                  {activity.type === 'test' ? (
-                    <Link href={`/test-analysis/${activity.id}?email=${encodeURIComponent('test@jeesimplified.com')}`}> {/* TODO: Use real email context */}
-                      <ActivityItem item={activity} />
-                    </Link>
-                  ) : (
-                    <ActivityItem item={activity} />
-                  )}
-                </div>
+                <ActivityItem key={activity.id} item={activity} />
               ))}
             </div>
           </TabsContent>
-
+          
+          <TabsContent value="questions" className="mt-0 pt-0">
+            <div className="space-y-1">
+              {activities.filter(a => a.type === 'question').map((activity) => (
+                <ActivityItem key={activity.id} item={activity} />
+              ))}
+            </div>
+          </TabsContent>
+          
           <TabsContent value="tests" className="mt-0 pt-0">
             <div className="space-y-1">
               {activities.filter(a => a.type === 'test').map((activity) => (
-                <Link key={activity.id} href={`/test-analysis/${activity.id}?email=${encodeURIComponent('test@jeesimplified.com')}`}>
-                  <ActivityItem item={activity} />
-                </Link>
+                <ActivityItem key={activity.id} item={activity} />
               ))}
             </div>
           </TabsContent>
