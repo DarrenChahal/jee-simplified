@@ -122,6 +122,7 @@ const RecentActivity = ({ activities = [], email }: RecentActivityProps) => {
         <Tabs defaultValue="all" className="w-full">
           <TabsList className="mb-4 bg-muted/50">
             <TabsTrigger value="all" className="text-xs">All Activity</TabsTrigger>
+            <TabsTrigger value="questions" className="text-xs">Questions</TabsTrigger>
             <TabsTrigger value="tests" className="text-xs">Tests</TabsTrigger>
           </TabsList>
 
