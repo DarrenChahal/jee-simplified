@@ -6,6 +6,7 @@ import TestSummary from "@/components/test-analysis/TestSummary";
 import SubjectProgress from "@/components/profile/SubjectProgress"; // Reusing existing
 import { ArrowLeft, BookOpen, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import EffortAnalysis from "@/components/test-analysis/EffortAnalysis";
 import { Button } from "@/components/ui/button";
 
 // Fetch data from backend
@@ -38,7 +39,7 @@ export default async function TestAnalysisPage({ params, searchParams }: PagePro
     const userEmail = email || "test@jeesimplified.com";
 
     const data = await getTestAnalytics(id, userEmail);
-
+    console.log("Test Analytics Data:", data);
     // Transform Subjects for the Reused Component
     const subjectData = data.subjects.map((s: any) => ({
         name: s.subject,
@@ -55,7 +56,7 @@ export default async function TestAnalysisPage({ params, searchParams }: PagePro
 
                 {/* Header */}
                 <div className="flex items-center gap-4">
-                    <Link href={`/profile/${encodeURIComponent(userEmail)}`}>
+                    <Link href={`/analytics/${encodeURIComponent(userEmail)}`}>
                         <Button variant="outline" size="icon" className="rounded-full">
                             <ArrowLeft className="w-5 h-5" />
                         </Button>
@@ -74,6 +75,11 @@ export default async function TestAnalysisPage({ params, searchParams }: PagePro
                 {/* 2. The Dip (Time Performance) */}
                 <MotionContainer delay={0.1}>
                     <TimePerformanceChart data={data.time_performance} />
+                </MotionContainer>
+
+                {/* 2b. Effort Analysis (ROI) */}
+                <MotionContainer delay={0.15}>
+                    <EffortAnalysis subjects={data.subjects} topics={data.topics} />
                 </MotionContainer>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
