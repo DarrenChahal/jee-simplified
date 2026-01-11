@@ -94,9 +94,10 @@ import Link from "next/link";
 
 interface RecentActivityProps {
   activities?: ActivityItem[];
+  email?: string;
 }
 
-const RecentActivity = ({ activities = [] }: RecentActivityProps) => {
+const RecentActivity = ({ activities = [], email }: RecentActivityProps) => {
   // If no activities provided, show empty state or fallback
   if (activities.length === 0) {
     return (
@@ -108,6 +109,8 @@ const RecentActivity = ({ activities = [] }: RecentActivityProps) => {
       </Card>
     );
   }
+
+  const userEmail = email || 'test@jeesimplified.com';
 
   return (
     <Card className="hover:shadow-hover transition-all duration-300">
@@ -127,7 +130,7 @@ const RecentActivity = ({ activities = [] }: RecentActivityProps) => {
               {activities.map((activity) => (
                 <div key={activity.id}>
                   {activity.type === 'test' ? (
-                    <Link href={`/test-analysis/${activity.id}?email=${encodeURIComponent('test@jeesimplified.com')}`}> {/* TODO: Use real email context */}
+                    <Link href={`/test-analysis/${activity.id}?email=${encodeURIComponent(userEmail)}`}>
                       <ActivityItem item={activity} />
                     </Link>
                   ) : (
@@ -141,7 +144,7 @@ const RecentActivity = ({ activities = [] }: RecentActivityProps) => {
           <TabsContent value="tests" className="mt-0 pt-0">
             <div className="space-y-1">
               {activities.filter(a => a.type === 'test').map((activity) => (
-                <Link key={activity.id} href={`/test-analysis/${activity.id}?email=${encodeURIComponent('test@jeesimplified.com')}`}>
+                <Link key={activity.id} href={`/test-analysis/${activity.id}?email=${encodeURIComponent(userEmail)}`}>
                   <ActivityItem item={activity} />
                 </Link>
               ))}

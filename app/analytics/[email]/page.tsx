@@ -154,7 +154,7 @@ export default async function AnalyticsPage({ params }: PageProps) {
 
                 {/* Recent Activity Full Width */}
                 <MotionContainer delay={0.6}>
-                    <RecentActivity activities={data.recentTests} />
+                    <RecentActivity activities={data.recentTests} email={decodedEmail} />
                 </MotionContainer>
             </div>
         </div>
