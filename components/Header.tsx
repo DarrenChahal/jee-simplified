@@ -72,8 +72,8 @@ export default function Header() {
                         Previous Years
                     </Link>
                     <Link
-                        href="/analytics"
-                        className={`px-4 py-2 text-sm font-medium transition-colors relative border-b-2 ${pathname === "/analytics"
+                        href={`/analytics/${encodeURIComponent(user?.primaryEmailAddress?.emailAddress || "test@jeesimplified.com")}`}
+                        className={`px-4 py-2 text-sm font-medium transition-colors relative border-b-2 ${pathname.startsWith("/analytics")
                             ? "text-primary border-primary"
                             : "border-transparent hover:text-primary hover:border-primary"
                             }`}
@@ -159,8 +159,8 @@ export default function Header() {
                             Previous Years
                         </Link>
                         <Link
-                            href="/analytics"
-                            className={`block px-4 py-2 text-sm font-medium rounded-md ${pathname === "/analytics" ? "bg-primary/10 text-primary" : "hover:bg-gray-50"
+                            href={`/analytics/${encodeURIComponent(user?.primaryEmailAddress?.emailAddress || "test@jeesimplified.com")}`}
+                            className={`block px-4 py-2 text-sm font-medium rounded-md ${pathname.startsWith("/analytics") ? "bg-primary/10 text-primary" : "hover:bg-gray-50"
                                 }`}
                             onClick={() => setIsMobileMenuOpen(false)}
                         >
