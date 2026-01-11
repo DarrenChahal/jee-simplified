@@ -15,7 +15,7 @@ import 'katex/dist/katex.min.css'
 import { useUser } from "@clerk/nextjs"
 
 // Types
-type QuestionType = 'input' | 'single-select' | 'multi-select';
+type QuestionType = 'input' | 'single_choice' | 'multi-select';
 
 interface UserAnswer {
     input?: string;
@@ -246,14 +246,15 @@ export default function ViewProblemsPage() {
 
         // Check answer locally using correct_answer field
         let verdict: 'correct' | 'incorrect' = 'incorrect';
-        const qType = currentQ.answer?.type || currentQ.type || 'single_choice';
+        let qType = currentQ.answer?.type || currentQ.type || 'single_choice';
+        if (qType === 'single-select') qType = 'single_choice';
 
         console.log('[Check Answer] Question:', currentQ._id);
         console.log('[Check Answer] Type:', qType);
         console.log('[Check Answer] Correct answer:', currentQ.answer?.correct_answer, typeof currentQ.answer?.correct_answer);
         console.log('[Check Answer] User answer:', qState.answer);
 
-        if (qType === 'single-select' || qType === 'single_choice') {
+        if (qType === 'single_choice') {
             // For single-select, correct_answer is a number (0, 1, 2, 3, etc.)
             const userAnswer = qState.answer.selected_option;
             const correctAnswer = currentQ.answer?.correct_answer;
@@ -363,7 +364,9 @@ export default function ViewProblemsPage() {
     const renderQuestionInput = () => {
         if (!currentQ) return null;
 
-        const qType = currentQ.answer?.type || currentQ.type || 'single_choice';
+        let qType = currentQ.answer?.type || currentQ.type || 'single_choice';
+        if (qType === 'single-select') qType = 'single_choice';
+
         const qState = questionsState[currentQ._id];
         const isCorrect = qState?.feedback?.verdict === 'correct';
         const isIncorrect = qState?.feedback?.verdict === 'incorrect';
@@ -371,14 +374,14 @@ export default function ViewProblemsPage() {
 
         // Helper to check if option is selected
         const isOptionSelected = (idx: number) => {
-            if (qType === 'single-select' || qType === 'single_choice') return qState?.answer?.selected_option === idx;
+            if (qType === 'single_choice') return qState?.answer?.selected_option === idx;
             if (qType === 'multi-select' || qType === 'multi_choice') return qState?.answer?.selected_options?.includes(idx);
             return false;
         };
 
         // Helper to check if option is the correct answer
         const isCorrectAnswer = (idx: number) => {
-            if (qType === 'single-select' || qType === 'single_choice') {
+            if (qType === 'single_choice') {
                 const correctAns = currentQ.answer?.correct_answer;
                 return idx === correctAns || idx === Number(correctAns) || String(idx) === String(correctAns);
             }

@@ -17,7 +17,7 @@ import { useUser } from "@clerk/nextjs"
 // Types based on User Schema (Updated)
 // Types based on User Schema (Updated)
 type AnswerStatus = 'skip' | 'answered' | 'review' | 'review-answered';
-type QuestionType = 'input' | 'single-select' | 'multi-select';
+type QuestionType = 'input' | 'single_choice' | 'multi-select';
 type InternalStatus = 'none' | 'answered' | 'skipped' | 'review' | 'review-answered';
 
 interface SolvedDuringTest {
@@ -481,7 +481,7 @@ export default function TakeTestPage() {
             time_taken: Math.round(newTimeSpent / 1000), // CUMULATIVE time in seconds
             answer: payloadAnswer,
             submittedAt: Date.now(),
-            question_type: currentQ.type || 'single-select',
+            question_type: (currentQ.type === 'single-select' ? 'single_choice' : currentQ.type) || 'single_choice',
             verdict: 'nothing'
         };
 
@@ -630,7 +630,7 @@ export default function TakeTestPage() {
     const renderQuestionInput = () => {
         if (!currentQ) return null;
 
-        const qType = currentQ.type || 'single-select';
+        const qType = currentQ.type || 'single_choice';
 
         if (qType === 'input') {
             return (
