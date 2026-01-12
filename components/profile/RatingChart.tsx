@@ -27,9 +27,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         return (
             <div className="bg-white border border-gray-200 p-3 rounded-lg shadow-xl">
                 <p className="text-sm font-medium mb-1 text-gray-500">{label}</p>
-                <p className="text-lg font-bold text-blue-600">
-                    {payload[0].value} <span className="text-xs font-normal text-muted-foreground">Rating</span>
-                </p>
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-600" />
+                    <p className="text-lg font-bold text-gray-900">
+                        {payload[0].value} <span className="text-xs font-normal text-muted-foreground">Rating</span>
+                    </p>
+                </div>
             </div>
         );
     }
@@ -91,7 +94,7 @@ const RatingChart = ({ data, currentRating, startRating }: RatingChartProps) => 
                             dy={10}
                         />
                         <YAxis
-                            domain={['dataMin - 100', 'dataMax + 100']}
+                            domain={['auto', 'auto']}
                             axisLine={false}
                             tickLine={false}
                             tick={{ fill: '#64748b', fontSize: 12 }}
@@ -104,6 +107,8 @@ const RatingChart = ({ data, currentRating, startRating }: RatingChartProps) => 
                             strokeWidth={3}
                             fillOpacity={1}
                             fill="url(#colorRating)"
+                            dot={{ r: 4, strokeWidth: 2, fill: "#fff", stroke: "#3b82f6" }}
+                            activeDot={{ r: 6, strokeWidth: 0, fill: "#3b82f6" }}
                         />
                     </AreaChart>
                 </ResponsiveContainer>
