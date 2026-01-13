@@ -41,14 +41,51 @@ export default async function TestAnalysisPage({ params, searchParams }: PagePro
     const data = await getTestAnalytics(id, userEmail);
     console.log("Test Analytics Data:", data);
     // Transform Subjects for the Reused Component
-    const subjectData = data.subjects.map((s: any) => ({
-        name: s.subject,
-        totalQuestions: 10, // Placeholder as backend didn't send total per subject in this specific response
-        solved: 10,         // Placeholder
-        correct: Math.round((s.accuracy / 100) * 10),
-        incorrect: 10 - Math.round((s.accuracy / 100) * 10),
-        accuracy: s.accuracy
-    }));
+    const subjectData = data.subjects.map((s: any) => {
+        // Calculate solved (attempted) based on correct answers and accuracy
+        // accuracy = (correct / solved) * 100  => solved = correct / (accuracy/100)
+        // Handle edge case where accuracy is 0 to avoid division by zero
+        let solved = 0;
+        if (s.accuracy > 0) {
+            solved = Math.round(s.correct_answers / (s.accuracy / 100));
+        } else {
+            // If accuracy is 0, solved could be merely incorrect answers, but we don't have incorrect count directly. 
+            // We only have correct_answers (which is 0) and total_questions.
+            // In this case, we can't easily infer 'solved' (attempted) without 'incorrect' count from backend.
+            // Assumption: If accuracy is 0, solved might be 0? Or user got everything wrong.
+            // If the user insists on 'total questions' being sent, maybe we can assume solved = incorrect + correct?
+            // But we don't have incorrect.
+            // Let's assume solved = correct + incorrect. incorrect = solved - correct.
+            // If the backend assumes 'accuracy' is (correct/attempted)*100.
+            // Without 'incorrect' count from backend, we can't perfectly reconstruct 'attempted' if accuracy is 0.
+            // However, usually if accuracy is 0, it means either 0 attempted or all attempted were wrong.
+            // For now, let's defer to a safe fallback or calculation.
+            // Actually, if accuracy is 0 and correct is 0, solved is unknown (could be 1 wrong, 5 wrong). 
+            // Ideally backend should send 'attempted' or 'incorrect'. 
+            // Given the prompt only mentions 'total_questions' is added, we have limited info. 
+            // Let's try to infer: invalid scenario or 0.
+            solved = 0; // Fallback if we really can't tell.
+        }
+
+        // Wait, if I look at the previous code, correct was derived from accuracy: correct = (accuracy/100) * 10.
+        // Now correct_answers IS provided.
+        // And accuracy is provided.
+        
+        // If the backend provides: subject: 'Physics', accuracy: 50, total_time_spent: 7, correct_answers: 1.
+        // solved = 1 / 0.5 = 2.
+        
+        const correct = s.correct_answers;
+        const incorrect = solved - correct;
+
+        return {
+            name: s.subject,
+            totalQuestions: s.total_questions || 0, 
+            solved: solved,
+            correct: correct,
+            incorrect: incorrect > 0 ? incorrect : 0, 
+            accuracy: s.accuracy
+        };
+    });
 
     return (
         <div className="min-h-screen bg-gray-50 pb-20">
@@ -63,7 +100,6 @@ export default async function TestAnalysisPage({ params, searchParams }: PagePro
                     </Link>
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">Test Analysis</h1>
-                        <p className="text-sm text-muted-foreground">Detailed report for Test #{data.test_id.slice(-6)}</p>
                     </div>
                 </div>
 
@@ -82,49 +118,20 @@ export default async function TestAnalysisPage({ params, searchParams }: PagePro
                     <EffortAnalysis subjects={data.subjects} topics={data.topics} />
                 </MotionContainer>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 gap-6">
                     {/* 3. Subject Analysis */}
-                    <div className="lg:col-span-2">
+                    <div className="w-full">
                         <MotionContainer delay={0.2}>
                             <SubjectProgress subjects={subjectData} />
                         </MotionContainer>
                     </div>
 
-                    {/* 4. Weak Areas */}
-                    <div className="space-y-6">
+                    {/* 4. Weak Areas - Hidden for now */}
+                    {/* <div className="space-y-6">
                         <MotionContainer delay={0.3}>
-                            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm h-full">
-                                <div className="flex items-center gap-2 mb-6">
-                                    <AlertTriangle className="w-5 h-5 text-red-500" />
-                                    <h3 className="font-bold text-gray-900">Weak Areas</h3>
-                                </div>
-
-                                {data.weak_areas.length === 0 ? (
-                                    <div className="text-center py-10 text-muted-foreground bg-gray-50 rounded-xl border border-dashed text-sm">
-                                        No specific weak areas detected in this test! 🎉
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {data.weak_areas.map((w: any, idx: number) => (
-                                            <div key={idx} className="p-3 bg-red-50 rounded-lg flex justify-between items-center group hover:bg-red-100 transition-colors cursor-pointer">
-                                                <div>
-                                                    <p className="font-bold text-gray-900 text-sm">{w.topic}</p>
-                                                    <p className="text-xs text-red-600">{w.subject}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="font-bold text-red-700">{w.accuracy}%</p>
-                                                    <p className="text-[10px] text-red-500 uppercase tracking-wide">Accuracy</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                <div className="mt-4 pt-4 border-t border-gray-100 text-center">
-                                    <Button variant="link" className="text-blue-600">View Recommended Practice</Button>
-                                </div>
-                            </div>
+                           ...
                         </MotionContainer>
-                    </div>
+                    </div> */}
                 </div>
 
             </div>
