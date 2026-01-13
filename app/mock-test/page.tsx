@@ -785,7 +785,7 @@ export default function MockTestPage() {
             title: result.title,
             date: new Date(result.submittedAt).toLocaleDateString(),
             time: new Date(result.submittedAt).toLocaleTimeString(),
-            rating: `${result.ratingChange >= 0 ? '+' : ''}${result.ratingChange} ${result.ratingAfterTest}`,
+            rating: `${result.ratingChange >= 0 ? '+' : ''}${result.ratingChange}`,
             finishTime: new Date(result.timeTaken * 1000).toISOString().substr(11, 8),
             solved: `${result.questionsSolved}/${result.totalQuestions}`,
             ranking: result.rank ? `${result.rank}/${result.totalParticipants}` : 'N/A',
@@ -845,8 +845,8 @@ export default function MockTestPage() {
 
           console.log('[Past Tests] Formatted tests:', formattedTests);
           setPastTests(formattedTests);
-          if (data.data.totalPages) {
-            setPastTestsTotalPages(data.data.totalPages);
+          if (data.data.pagination && data.data.pagination.totalPages) {
+            setPastTestsTotalPages(data.data.pagination.totalPages);
           }
         } else {
           console.log('[Past Tests] No data found or invalid format');
