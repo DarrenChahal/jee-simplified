@@ -1203,14 +1203,16 @@ export default function MockTestPage() {
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-xs border-blue-200 hover:bg-blue-50 hover:border-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/30"
-                                onClick={() => router.push(`/mock-test/edit/${test.id}`)}
-                              >
-                                <Edit className="h-3 w-3 mr-1" /> Edit
-                              </Button>
+                              {['draft', 'scheduled'].includes(test.status.toLowerCase()) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs border-blue-200 hover:bg-blue-50 hover:border-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/30"
+                                  onClick={() => router.push(`/mock-test/edit/${test.id}`)}
+                                >
+                                  <Edit className="h-3 w-3 mr-1" /> Edit
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
