@@ -581,3 +581,10 @@
 .to-jee-mathematics {
   --tw-gradient-to: #a855f7;
 }
+
+/* Ensure spin buttons are visible for number inputs with this class */
+.show-spinners::-webkit-inner-spin-button,
+.show-spinners::-webkit-outer-spin-button {
+  -webkit-appearance: inner-spin-button;
+  opacity: 1;
+}

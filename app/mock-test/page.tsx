@@ -785,7 +785,7 @@ export default function MockTestPage() {
             title: result.title,
             date: new Date(result.submittedAt).toLocaleDateString(),
             time: new Date(result.submittedAt).toLocaleTimeString(),
-            rating: `${result.ratingChange >= 0 ? '+' : ''}${result.ratingChange} ${result.ratingAfterTest}`,
+            rating: `${result.ratingChange >= 0 ? '+' : ''}${result.ratingChange}`,
             finishTime: new Date(result.timeTaken * 1000).toISOString().substr(11, 8),
             solved: `${result.questionsSolved}/${result.totalQuestions}`,
             ranking: result.rank ? `${result.rank}/${result.totalParticipants}` : 'N/A',
@@ -845,8 +845,8 @@ export default function MockTestPage() {
 
           console.log('[Past Tests] Formatted tests:', formattedTests);
           setPastTests(formattedTests);
-          if (data.data.totalPages) {
-            setPastTestsTotalPages(data.data.totalPages);
+          if (data.data.pagination && data.data.pagination.totalPages) {
+            setPastTestsTotalPages(data.data.pagination.totalPages);
           }
         } else {
           console.log('[Past Tests] No data found or invalid format');
@@ -1152,7 +1152,7 @@ export default function MockTestPage() {
                 </Button>
               </div>
               <Button
-                onClick={() => setShowTemplateDialog(true)}
+                onClick={() => router.push('/mock-test/create')}
                 className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
               >
                 <Plus className="h-4 w-4 mr-2" /> Add New Test
@@ -1203,14 +1203,16 @@ export default function MockTestPage() {
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-xs border-blue-200 hover:bg-blue-50 hover:border-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/30"
-                                onClick={() => router.push(`/mock-test/edit/${test.id}`)}
-                              >
-                                <Edit className="h-3 w-3 mr-1" /> Edit
-                              </Button>
+                              {['draft', 'scheduled'].includes(test.status.toLowerCase()) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs border-blue-200 hover:bg-blue-50 hover:border-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/30"
+                                  onClick={() => router.push(`/mock-test/edit/${test.id}`)}
+                                >
+                                  <Edit className="h-3 w-3 mr-1" /> Edit
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
