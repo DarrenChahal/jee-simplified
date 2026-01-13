@@ -4,7 +4,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { ArrowRight, ChevronRight, Clock, Code, FileText, TrendingUp, Trophy, BookOpen, Zap, Brain, Lightbulb } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { SignInButton, SignUpButton } from "@clerk/nextjs"
+import { SignInButton, SignUpButton, SignedIn, SignedOut } from "@clerk/nextjs"
 
 export default function Home() {
   return (
@@ -43,16 +43,25 @@ export default function Home() {
                 Transform complex concepts into simple understanding. Our platform makes JEE preparation efficient, effective, and enjoyable.
               </p>
               <div className="flex flex-col gap-3 min-[400px]:flex-row pt-2">
-                <SignUpButton mode="modal">
-                  <Button size="lg" className="takeuforward-button group transition-all duration-300 transform hover:scale-105 pulse-animation">
-                    Get Started Free <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                <SignedOut>
+                  <SignUpButton mode="modal">
+                    <Button size="lg" className="takeuforward-button group transition-all duration-300 transform hover:scale-105 pulse-animation">
+                      Get Started Free <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                  </SignUpButton>
+                  <SignInButton mode="modal">
+                    <Button variant="outline" size="lg">
+                      Sign In
+                    </Button>
+                  </SignInButton>
+                </SignedOut>
+                <SignedIn>
+                  <Button size="lg" className="takeuforward-button group transition-all duration-300 transform hover:scale-105 pulse-animation" asChild>
+                    <Link href="/mock-test">
+                      Get Started <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </Link>
                   </Button>
-                </SignUpButton>
-                <SignInButton mode="modal">
-                  <Button variant="outline" size="lg">
-                    Sign In
-                  </Button>
-                </SignInButton>
+                </SignedIn>
               </div>
             </div>
             <div className="relative mx-auto w-full max-w-lg">
@@ -224,11 +233,20 @@ export default function Home() {
               </p>
             </div>
             <div className="flex flex-col gap-3 min-[400px]:flex-row">
-              <SignUpButton mode="modal">
-                <Button size="lg" variant="secondary" className="transition-all duration-300 transform hover:scale-105">
-                  Get Started for Free <ArrowRight className="ml-2 h-4 w-4" />
+              <SignedOut>
+                <SignUpButton mode="modal">
+                  <Button size="lg" variant="secondary" className="transition-all duration-300 transform hover:scale-105">
+                    Get Started for Free <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </SignUpButton>
+              </SignedOut>
+              <SignedIn>
+                <Button size="lg" variant="secondary" className="transition-all duration-300 transform hover:scale-105" asChild>
+                  <Link href="/mock-test">
+                    Get Started <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
                 </Button>
-              </SignUpButton>
+              </SignedIn>
             </div>
           </div>
         </div>

@@ -599,7 +599,8 @@ function CreateTestContent() {
                   id="test-questions"
                   type="number"
                   min="1"
-                  value={testDetails.questions}
+                  className="show-spinners"
+                  value={testDetails.questions || ''}
                   onChange={(e) => setTestDetails({ ...testDetails, questions: parseInt(e.target.value) || 0 })}
                 />
               </div>
@@ -610,7 +611,8 @@ function CreateTestContent() {
                   id="test-duration"
                   type="number"
                   min="1"
-                  value={testDetails.duration}
+                  className="show-spinners"
+                  value={testDetails.duration || ''}
                   onChange={(e) => setTestDetails({ ...testDetails, duration: parseInt(e.target.value) || 0 })}
                 />
               </div>
@@ -657,13 +659,13 @@ function CreateTestContent() {
           </div>
 
           <div className="mt-8 flex justify-between">
-            <Button
+            {/* <Button
               variant="outline"
               onClick={() => setShowSaveTemplateDialog(true)}
               className="flex items-center gap-2"
             >
               <Save className="h-4 w-4" /> Save as Template
-            </Button>
+            </Button> */}
 
             <div className="flex gap-4">
               <Button variant="outline" onClick={() => router.push('/mock-test')}>

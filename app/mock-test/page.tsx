@@ -1152,7 +1152,7 @@ export default function MockTestPage() {
                 </Button>
               </div>
               <Button
-                onClick={() => setShowTemplateDialog(true)}
+                onClick={() => router.push('/mock-test/create')}
                 className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
               >
                 <Plus className="h-4 w-4 mr-2" /> Add New Test
