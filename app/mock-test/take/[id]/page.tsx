@@ -17,7 +17,7 @@ import { useUser } from "@clerk/nextjs"
 // Types based on User Schema (Updated)
 // Types based on User Schema (Updated)
 type AnswerStatus = 'skip' | 'answered' | 'review' | 'review-answered';
-type QuestionType = 'input' | 'single-select' | 'multi-select';
+type QuestionType = 'input' | 'single_choice' | 'multi-select';
 type InternalStatus = 'none' | 'answered' | 'skipped' | 'review' | 'review-answered';
 
 interface SolvedDuringTest {
@@ -73,7 +73,7 @@ export default function TakeTestPage() {
     // Core State: Map of QuestionID -> QuestionState
     const [questionsState, setQuestionsState] = useState<Record<string, QuestionState>>({})
 
-    const [timeRemaining, setTimeRemaining] = useState(5400)
+    const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
     const [isTestSubmitted, setIsTestSubmitted] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
     const [testDetails, setTestDetails] = useState<any>(null)
@@ -109,9 +109,11 @@ export default function TakeTestPage() {
                     if (data.success) {
                         setTestDetails(data.data)
 
+                        const duration = data.data.test_duration || data.data.duration;
+
                         // Check if test has expired (current time > test start + duration)
-                        if (data.data.test_date && data.data.duration) {
-                            const testEndTime = data.data.test_date + (data.data.duration * 60 * 1000);
+                        if (data.data.test_date && duration) {
+                            const testEndTime = data.data.test_date + (duration * 60 * 1000);
                             const currentTime = Date.now();
 
                             if (currentTime >= testEndTime) {
@@ -127,8 +129,27 @@ export default function TakeTestPage() {
                             }
                         }
 
-                        if (data.data.duration) {
-                            setTimeRemaining(data.data.duration * 60)
+                        if (duration) {
+                            let calculatedDuration = duration * 60;
+
+                            if (data.data.test_date) {
+                                const testEndTime = data.data.test_date + (duration * 60 * 1000);
+                                const now = Date.now();
+                                const secondsUntilEnd = Math.floor((testEndTime - now) / 1000);
+
+                                // If the test has started, the remaining time is limited by the end time.
+                                // If secondsUntilEnd is less than the full duration, it means we are late or in the middle of the test window.
+                                if (secondsUntilEnd < calculatedDuration) {
+                                    console.log("Adjusting timer for late entry/ongoing test. Seconds until end:", secondsUntilEnd);
+                                    calculatedDuration = Math.max(0, secondsUntilEnd);
+                                }
+                            }
+
+                            console.log("Setting effective test duration:", calculatedDuration);
+                            setTimeRemaining(calculatedDuration)
+                        } else {
+                            console.warn("Test duration missing, defaulting to 180 minutes");
+                            setTimeRemaining(180 * 60); // Fallback
                         }
                     }
                 }
@@ -247,14 +268,15 @@ export default function TakeTestPage() {
 
     // Timer effect with additional safeguard for test end time
     useEffect(() => {
-        if (timeRemaining > 0 && !isTestSubmitted && !isLoading) {
+        if (timeRemaining !== null && timeRemaining > 0 && !isTestSubmitted && !isLoading) {
             const timer = setTimeout(() => {
                 setTimeRemaining(timeRemaining - 1);
             }, 1000);
 
             // Additional safeguard: Check if current time exceeds test end time
-            if (testDetails?.test_date && testDetails?.duration) {
-                const testEndTime = testDetails.test_date + (testDetails.duration * 60 * 1000);
+            const duration = testDetails?.test_duration || testDetails?.duration;
+            if (testDetails?.test_date && duration) {
+                const testEndTime = testDetails.test_date + (duration * 60 * 1000);
                 const currentTime = Date.now();
 
                 if (currentTime >= testEndTime) {
@@ -446,8 +468,9 @@ export default function TakeTestPage() {
 
         // Generate deterministic ID
         // Calculate effective timestamp (ID)
-        const testEndTime = testDetails?.test_date && testDetails?.duration
-            ? testDetails.test_date + (testDetails.duration * 60 * 1000)
+        const duration = testDetails?.test_duration || testDetails?.duration;
+        const testEndTime = testDetails?.test_date && duration
+            ? testDetails.test_date + (duration * 60 * 1000)
             : 0;
 
         const effectiveAttemptId = (testDetails?.test_date && Date.now() < testEndTime)
@@ -465,8 +488,9 @@ export default function TakeTestPage() {
         // For skip/review without answer, send empty object as per spec
 
         // Calculate duration passed
-        const totalDuration = testDetails?.duration ? testDetails.duration * 60 : 5400;
-        const durationPassed = totalDuration - timeRemaining;
+        const totalDuration = (testDetails?.test_duration || testDetails?.duration) ? (testDetails?.test_duration || testDetails?.duration) * 60 : 5400;
+        const currentRem = timeRemaining !== null ? timeRemaining : totalDuration;
+        const durationPassed = totalDuration - currentRem;
 
         const payload: AnswerPayload & { _id: string } = {
             _id: answerId, // Deterministic ID
@@ -481,7 +505,7 @@ export default function TakeTestPage() {
             time_taken: Math.round(newTimeSpent / 1000), // CUMULATIVE time in seconds
             answer: payloadAnswer,
             submittedAt: Date.now(),
-            question_type: currentQ.type || 'single-select',
+            question_type: (currentQ.type === 'single-select' ? 'single_choice' : currentQ.type) || 'single_choice',
             verdict: 'nothing'
         };
 
@@ -630,7 +654,7 @@ export default function TakeTestPage() {
     const renderQuestionInput = () => {
         if (!currentQ) return null;
 
-        const qType = currentQ.type || 'single-select';
+        const qType = currentQ.type || 'single_choice';
 
         if (qType === 'input') {
             return (
@@ -740,13 +764,15 @@ export default function TakeTestPage() {
         }
     };
 
-    const formatTime = (seconds: number) => {
+    const formatTime = (seconds: number | null) => {
+        if (seconds === null) return "--:--";
         const minutes = Math.floor(seconds / 60);
         const remainingSeconds = seconds % 60;
         return `${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
     };
 
     const getTimerClass = () => {
+        if (timeRemaining === null) return "test-timer text-primary font-bold flex items-center";
         const minutesLeft = Math.floor(timeRemaining / 60);
         if (minutesLeft < 5) return "test-timer test-timer-danger text-red-600 font-bold flex items-center";
         if (minutesLeft < 15) return "test-timer test-timer-warning text-amber-600 font-bold flex items-center";
@@ -785,7 +811,7 @@ export default function TakeTestPage() {
                             {Object.values(questionsState).filter(q => q.marked_as === 'answered' || q.marked_as === 'review-answered').length} of {questions.length} questions answered
                         </div>
                         <div className="text-sm text-muted-foreground">
-                            Time remaining: {Math.floor(timeRemaining / 60)} minutes
+                            Time remaining: {timeRemaining !== null ? Math.floor(timeRemaining / 60) : '--'} minutes
                         </div>
                     </div>
                     <div className="h-2 w-full bg-secondary rounded-full mt-2 overflow-hidden">

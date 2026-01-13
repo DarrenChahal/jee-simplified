@@ -23,9 +23,11 @@ export const apiUrls = {
     submitTest: `${BASE_API_URL}/users/test-submission/`,
     getRegisteredTests: (email: string) => `${BASE_API_URL}/users/registrations/${email}`,
     getSubmittedTests: `${BASE_API_URL}/users/submitted-tests/`,
+    getDashboardAnalytics: (email: string) => `${BASE_API_URL}/analytics/dashboard?email=${email}`,
     getDashboard: (email: string) => `${BASE_API_URL}/users/${email}/dashboard`,
     getTestResults: (email: string, page: number = 1, limit: number = 10) => `${BASE_API_URL}/users/test-results/${email}?page=${page}&limit=${limit}`,
     checkAdmin: (email: string) => `${BASE_API_URL}/users/check-admin?email=${email}`,
+    getTestAnalytics: (testId: string, email: string) => `${BASE_API_URL}/analytics/test/${testId}?email=${email}`,
   },
   templates: {
     getAll: `${BASE_API_URL}/templates`,
