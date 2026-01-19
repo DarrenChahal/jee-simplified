@@ -73,7 +73,21 @@ const transformData = (backendData: any) => {
         weakTopics: weakTopics.map((wt: any) => ({
             topic: wt.topic, subject: wt.subject, accuracy: wt.accuracy, frequency: wt.testCount
         })),
-        recentTests: backendData.recentTests
+        recentTests: (backendData.recentTests || []).map((test: any) => ({
+            id: test.id || test._id,
+            type: 'test' as const,
+            title: test.title,
+            description: test.description,
+            time: test.submission_time || new Date(test.test_date).toLocaleDateString(),
+            score: test.score_display || `${test.user_score || 0}/${test.max_score || 0}`,
+            subjects: test.subjects || [],
+            difficulty: test.difficulty?.toLowerCase() || 'medium',
+            test_duration: test.test_duration, // Already in minutes from backend
+            total_questions: test.questions,
+            percentile: test.registered_count && test.user_test_ranking 
+                ? Math.round(((test.registered_count - test.user_test_ranking) / test.registered_count) * 100)
+                : undefined
+        }))
     };
 };
 

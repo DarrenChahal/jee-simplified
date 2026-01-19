@@ -47,8 +47,7 @@ const SubjectCard = ({ subject }: { subject: SubjectData }) => {
           <div className="flex-1 text-center sm:text-left">
             <h3 className="text-lg font-bold text-gray-900">{subject.name}</h3>
             <p className="text-sm text-muted-foreground">
-              {subject.solved.toLocaleString()} / {subject.totalQuestions.toLocaleString()} questions
-              <span className={`ml-2 font-medium ${subject.accuracy > 75 ? "text-green-600" : subject.accuracy > 50 ? "text-amber-600" : "text-red-600"
+              <span className={`font-medium ${subject.accuracy > 75 ? "text-green-600" : subject.accuracy > 50 ? "text-amber-600" : "text-red-600"
                 }`}>
                 {subject.accuracy}% accuracy
               </span>
@@ -86,7 +85,7 @@ const SubjectCard = ({ subject }: { subject: SubjectData }) => {
 
         {/* Expanded Details - Always Visible */}
         <div className="space-y-2">
-          <div className="mt-6 grid grid-cols-3 gap-4 border-t border-gray-100 pt-4">
+          <div className="mt-6 grid grid-cols-2 gap-4 border-t border-gray-100 pt-4">
             <div className="text-center">
               <div className="text-xl font-bold text-green-600">{subject.correct}</div>
               <div className="text-xs text-muted-foreground">Correct</div>
@@ -94,10 +93,6 @@ const SubjectCard = ({ subject }: { subject: SubjectData }) => {
             <div className="text-center">
               <div className="text-xl font-bold text-red-600">{subject.incorrect}</div>
               <div className="text-xs text-muted-foreground">Incorrect</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xl font-bold text-gray-400">{remaining}</div>
-              <div className="text-xs text-muted-foreground">Remaining</div>
             </div>
           </div>
         </div>
