@@ -36,8 +36,8 @@ export default function Header() {
                     <Link href="/" className="flex items-center">
                         <BookOpen className="h-6 w-6 text-primary" />
                         <span>
-                            JEE
-                            <span className="gradient-heading">Simplified</span>
+                            solve
+                            <span className="gradient-heading">IIT</span>
                         </span>
                     </Link>
                 </div>

@@ -34,7 +34,7 @@ export default function Home() {
                 Your JEE Success Journey Starts Here
               </div>
               <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl xl:text-5xl/none">
-                Welcome to <span className="gradient-heading animate-text-gradient">JEE Simplified</span>
+                Welcome to <span className="gradient-heading animate-text-gradient">solveIIT</span>
               </h1>
               <p className="text-xl font-bold text-primary-600 my-3 animate-bounce-slow">
                 <span className="typewriter">Crack the Code, Ace the Exam!</span>
@@ -229,7 +229,7 @@ export default function Home() {
             <div className="space-y-4">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">Ready to Crack JEE?</h2>
               <p className="mx-auto max-w-[700px] md:text-xl">
-                Join thousands of students who are mastering JEE subjects with JEE<span className="font-bold">Simplified</span>.
+                Join thousands of students who are mastering JEE subjects with solve<span className="font-bold">IIT</span>.
               </p>
             </div>
             <div className="flex flex-col gap-3 min-[400px]:flex-row">

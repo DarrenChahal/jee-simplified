@@ -2,7 +2,8 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ChevronLeft, Edit, Trash2, Check, Save } from "lucide-react"
+import { useUser } from "@clerk/nextjs"
+import { ChevronLeft, Edit, Trash2, Check, Save, Upload, X, Image as ImageIcon, Plus, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -30,6 +31,7 @@ function CreateTestContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const templateParam = searchParams.get('template')
+  const { user } = useUser()
 
   // States for tracking API submission
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -67,6 +69,7 @@ function CreateTestContent() {
   // Questions state
   const [questions, setQuestions] = useState<{
     text: string;
+    images?: string[];
     options: { id: string; text: string }[];
     correctAnswer: string;
     for_class?: string[];
@@ -84,6 +87,8 @@ function CreateTestContent() {
       { id: "c", text: "" },
       { id: "d", text: "" },
     ],
+    images: [] as string[], // Stores the URLs from backend (for editing/display)
+    newFiles: [] as { file: File, preview: string }[], // Stores new files to upload
     correctAnswer: "a",
     for_class: ["11"],
     subjects: ["Physics"],
@@ -128,7 +133,7 @@ function CreateTestContent() {
         title: testDetails.title,
         description: testDetails.description,
         test_pattern: "none", // For now, just "none"
-        created_by: "test@jeesimplified.com", // Will change after signin is implemented
+        created_by: user?.primaryEmailAddress?.emailAddress || "test@jeesimplified.com",
         subjects: subjects, // Array of subjects
         difficulty: testDetails.difficulty,
         status: "draft",
@@ -223,34 +228,51 @@ function CreateTestContent() {
       ? testDetails.subject
       : [testDetails.subject];
 
-    // Construct payload for backend
-    const payload = {
-      subjects: currentQuestion.subjects,
-      for_class: currentQuestion.for_class,
-      topics: currentQuestion.topics,
-      difficulty: testDetails.difficulty || "Medium",
-      origin: {
-        type: "mock",
-        exam: "none",
-        test_id: testId
-      },
-      question_text: currentQuestion.text,
-      answer: {
-        type: "single_choice", // using single_choice for UI questions
-        options: currentQuestion.options.map(opt => opt.text),
-        correct_answer: correctOptionIndex.toString() // Send index (0-3) instead of text
-      },
-      tags: currentQuestion.tags,
-      status: "active",
-      created_by: "test@jeesimplified.com"
-    };
+    // Construct FormData for backend (Multipart)
+    const formData = new FormData();
+    formData.append('question_text', currentQuestion.text);
+    formData.append('difficulty', testDetails.difficulty || "Medium");
+
+    // Complex fields need to be handled carefully. 
+    formData.append('subjects', JSON.stringify(currentQuestion.subjects));
+    formData.append('for_class', JSON.stringify(currentQuestion.for_class));
+    formData.append('topics', JSON.stringify(currentQuestion.topics));
+    formData.append('tags', JSON.stringify(currentQuestion.tags));
+
+    // Pass existing images so backend keeps them
+    formData.append('existing_images', JSON.stringify(currentQuestion.images));
+
+    // Origin
+    formData.append('origin', JSON.stringify({
+      type: "mock",
+      exam: "none",
+      test_id: testId
+    }));
+
+    // Answer
+    formData.append('answer', JSON.stringify({
+      type: "single_choice",
+      options: currentQuestion.options.map(opt => opt.text),
+      correct_answer: correctOptionIndex.toString()
+    }));
+
+    formData.append('status', "active");
+    formData.append('created_by', user?.primaryEmailAddress?.emailAddress || "test@jeesimplified.com");
+
+    // Append New Images
+    if (currentQuestion.newFiles.length > 0) {
+      currentQuestion.newFiles.forEach(item => {
+        formData.append('images', item.file);
+      });
+    }
 
     // Send POST request to backend using our new API route
+    let savedImages: string[] = [];
     try {
+      // Note: Do NOT set Content-Type header when sending FormData, browser sets it with boundary
       const response = await fetch("/api/questions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: formData
       });
       const result = await response.json();
       if (!result.success) {
@@ -260,6 +282,14 @@ function CreateTestContent() {
           variant: "destructive"
         });
         return;
+      }
+
+      // Assuming result.data.images contains the array of all image URLs (existing + new)
+      if (result.data && result.data.images) {
+        savedImages = result.data.images;
+      } else if (result.data && result.data.image) {
+        // Fallback if backend only returns single image logic for now
+        savedImages = [result.data.image];
       }
     } catch (error) {
       console.error("Error adding question:", error);
@@ -274,6 +304,7 @@ function CreateTestContent() {
     // Prepare local question data
     const questionData = {
       text: currentQuestion.text,
+      images: savedImages.length > 0 ? savedImages : currentQuestion.images, // Use backend URLs
       options: [...currentQuestion.options],
       correctAnswer: currentQuestion.correctAnswer,
       for_class: currentQuestion.for_class,
@@ -315,6 +346,8 @@ function CreateTestContent() {
         { id: "d", text: "" },
       ],
       correctAnswer: "a",
+      images: [],
+      newFiles: [],
       for_class: ["11"],
       subjects: ["Physics"],
       topics: [] as string[],
@@ -329,6 +362,8 @@ function CreateTestContent() {
     const question = questions[index]
     setCurrentQuestion({
       ...question,
+      images: question.images || ((question as any).image ? [(question as any).image] : []), // Handle legacy single image
+      newFiles: [],
       for_class: question.for_class || ["11"],
       subjects: question.subjects || ["Physics"],
       topics: question.topics || [],
@@ -706,6 +741,11 @@ function CreateTestContent() {
                         <td className="px-4 py-4 w-12">{index + 1}</td>
                         <td className="px-4 py-4">
                           <div className="font-medium">{question.text.length > 80 ? question.text.substring(0, 80) + '...' : question.text}</div>
+                          {question.images && question.images.length > 0 && (
+                            <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+                              <span className="inline-block w-2 h-2 rounded-full bg-blue-500"></span> {question.images.length} Image{question.images.length !== 1 ? 's' : ''} attached
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-4 w-32">
                           Option {question.correctAnswer.toUpperCase()}
@@ -768,12 +808,6 @@ function CreateTestContent() {
                   <h3 className="font-semibold">
                     {currentQuestion.isEditMode ? "Edit Question" : "Add New Question"}
                   </h3>
-                  <button
-                    onClick={() => setShowPreview(!showPreview)}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    {showPreview ? 'Hide Preview' : 'Show Preview'}
-                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -907,7 +941,21 @@ function CreateTestContent() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="question-text">Question Text</Label>
+
+                  <div className="flex items-center gap-2 mb-1">
+                    <Label htmlFor="question-text">Question Text</Label>
+                    <button
+                      type="button"
+                      onClick={() => setShowPreview(!showPreview)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ml-2 ${showPreview
+                        ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-500/20'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                        }`}
+                    >
+                      {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showPreview ? 'Hide Preview' : 'Show Preview'}
+                    </button>
+                  </div>
                   <textarea
                     id="question-text"
                     placeholder="Enter the question text"
@@ -922,12 +970,208 @@ function CreateTestContent() {
                   />
                   {latexErrors && <p className="text-red-600 text-sm">{latexErrors[-1]}</p>}
                   {showPreview && !latexErrors[-1] && (
-                    <div className="border rounded p-4 bg-gray-50 mt-2 break-words">
+                    <div className="border rounded p-4 bg-gray-50 dark:bg-gray-900/30 mt-2 break-words">
                       <div className="overflow-x-auto">
                         <BlockMath math={currentQuestion.text} />
                       </div>
+
+                      {/* Show images in preview */}
+                      {(currentQuestion.images.length > 0 || currentQuestion.newFiles.length > 0) && (
+                        <div className="mt-4 pt-4 border-t">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">Attached Images:</p>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {/* Existing images */}
+                            {currentQuestion.images.map((url, idx) => (
+                              <div key={`preview-existing-${idx}`} className="relative">
+                                <img
+                                  src={url}
+                                  alt={`Attachment ${idx + 1}`}
+                                  className="rounded border border-gray-200 dark:border-gray-700 max-h-40 w-full object-contain bg-white dark:bg-gray-800"
+                                />
+                                <span className="absolute top-1 left-1 bg-gray-800/70 text-white text-[10px] px-1.5 py-0.5 rounded">
+                                  Saved
+                                </span>
+                              </div>
+                            ))}
+
+                            {/* New files preview */}
+                            {currentQuestion.newFiles.map((item, idx) => (
+                              <div key={`preview-new-${idx}`} className="relative">
+                                <img
+                                  src={item.preview}
+                                  alt={`New Attachment ${idx + 1}`}
+                                  className="rounded border border-blue-300 dark:border-blue-700 max-h-40 w-full object-contain bg-white dark:bg-gray-800"
+                                />
+                                <span className="absolute top-1 left-1 bg-blue-600/90 text-white text-[10px] px-1.5 py-0.5 rounded">
+                                  New
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
+                </div>
+
+
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Image Attachments</Label>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${(currentQuestion.images.length + currentQuestion.newFiles.length) >= 3
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                      }`}>
+                      {currentQuestion.images.length + currentQuestion.newFiles.length}/3 images
+                    </span>
+                  </div>
+
+                  {/* Custom File Upload Area */}
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="flex items-center justify-center w-full">
+                      <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer bg-blue-50/30 hover:bg-blue-50 dark:bg-blue-900/10 dark:hover:bg-blue-900/20 border-blue-200 dark:border-blue-800 transition-all duration-200 group">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <div className="p-3 bg-blue-100 dark:bg-blue-900/40 rounded-full mb-3 group-hover:scale-110 transition-transform duration-200">
+                            <Upload className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-300 font-medium"><span className="text-blue-600 dark:text-blue-400 font-semibold">Click to upload</span> or drag and drop</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">PNG, JPG, GIF, or WEBP (max 3 images per question)</p>
+                        </div>
+                        <input
+                          id="dropzone-file"
+                          type="file"
+                          className="hidden"
+                          multiple
+                          accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files.length > 0) {
+                              const filesArray = Array.from(e.target.files);
+
+                              // Calculate current total images (existing + new)
+                              const currentTotalImages = currentQuestion.images.length + currentQuestion.newFiles.length;
+                              const maxImages = 3;
+                              const remainingSlots = maxImages - currentTotalImages;
+
+                              // Check if already at max
+                              if (remainingSlots <= 0) {
+                                toast({
+                                  title: "Image limit reached",
+                                  description: "You can only upload a maximum of 3 images per question.",
+                                  variant: "destructive"
+                                });
+                                e.target.value = '';
+                                return;
+                              }
+
+                              // Filter and validate files
+                              const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+                              const validFiles: File[] = [];
+                              const invalidFiles: string[] = [];
+
+                              for (const file of filesArray) {
+                                // Check if file is an image
+                                if (!file.type.startsWith('image/') || !allowedTypes.includes(file.type)) {
+                                  invalidFiles.push(file.name);
+                                } else {
+                                  validFiles.push(file);
+                                }
+                              }
+
+                              // Show warning for invalid files
+                              if (invalidFiles.length > 0) {
+                                toast({
+                                  title: "Invalid file type",
+                                  description: `The following files are not valid images and were skipped: ${invalidFiles.join(', ')}`,
+                                  variant: "destructive"
+                                });
+                              }
+
+                              // Limit to remaining slots
+                              const filesToAdd = validFiles.slice(0, remainingSlots);
+
+                              // Warn if some files were skipped due to limit
+                              if (validFiles.length > remainingSlots) {
+                                toast({
+                                  title: "Some images skipped",
+                                  description: `Only ${remainingSlots} image${remainingSlots > 1 ? 's' : ''} can be added. Maximum of 3 images allowed per question.`,
+                                  variant: "destructive"
+                                });
+                              }
+
+                              if (filesToAdd.length > 0) {
+                                const newFileObjects = filesToAdd.map(file => ({
+                                  file,
+                                  preview: URL.createObjectURL(file)
+                                }));
+
+                                setCurrentQuestion(prev => ({
+                                  ...prev,
+                                  newFiles: [...prev.newFiles, ...newFileObjects]
+                                }));
+                              }
+
+                              // Reset input
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+
+                    {/* Image Previews Grid */}
+                    {(currentQuestion.images.length > 0 || currentQuestion.newFiles.length > 0) && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                        {/* Existing Images (Backend URLs) */}
+                        {currentQuestion.images.map((url, idx) => (
+                          <div key={`existing-${idx}`} className="relative group aspect-video bg-gray-100 rounded-lg overflow-hidden border">
+                            <img src={url} alt={`Attachment ${idx + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCurrentQuestion(prev => ({
+                                  ...prev,
+                                  images: prev.images.filter((_, i) => i !== idx)
+                                }));
+                              }}
+                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-80 hover:opacity-100 transition-opacity"
+                              title="Remove image"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-2 py-0.5 truncate">
+                              Saved
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* New Files (Local Previews) */}
+                        {currentQuestion.newFiles.map((item, idx) => (
+                          <div key={`new-${idx}`} className="relative group aspect-video bg-gray-100 rounded-lg overflow-hidden border border-blue-200">
+                            <img src={item.preview} alt={`New Attachment ${idx + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Revoke URL to avoid memory leaks
+                                URL.revokeObjectURL(item.preview);
+                                setCurrentQuestion(prev => ({
+                                  ...prev,
+                                  newFiles: prev.newFiles.filter((_, i) => i !== idx)
+                                }));
+                              }}
+                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-80 hover:opacity-100 transition-opacity"
+                              title="Remove image"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                            <div className="absolute bottom-0 left-0 right-0 bg-blue-500/50 text-white text-[10px] px-2 py-0.5 truncate">
+                              New
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-4">
                   <Label>Answer Options</Label>
@@ -1080,14 +1324,42 @@ function CreateTestContent() {
                         <h5 className="font-medium">Question {index + 1}</h5>
                         <Badge>Option {question.correctAnswer.toUpperCase()} is correct</Badge>
                       </div>
-                      <p className="mt-2">{question.text}</p>
+
+                      {/* Render question text with LaTeX */}
+                      <div className="mt-3 p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded border border-blue-100 dark:border-blue-900/30">
+                        <div className="overflow-x-auto">
+                          <BlockMath math={question.text} />
+                        </div>
+                      </div>
+
+                      {question.images && question.images.length > 0 && (
+                        <div className="mt-3 mb-2 grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {question.images.map((img, i) => (
+                            <img key={i} src={img} alt={`Attachment ${i}`} className="rounded border max-h-40 object-contain bg-gray-50" />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Backward compatibility for single image if needed */}
+                      {!question.images && (question as any).image && (
+                        <div className="mt-3 mb-2 max-w-md">
+                          <img src={(question as any).image} alt="Question attachment" className="rounded border max-h-60 object-contain" />
+                        </div>
+                      )}
+
+                      {/* Render options with LaTeX */}
                       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
                         {question.options.map((option) => (
                           <div
                             key={option.id}
-                            className={`p-2 rounded border ${option.id === question.correctAnswer ? 'border-green-500 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400' : 'border-muted'}`}
+                            className={`p-3 rounded border ${option.id === question.correctAnswer ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-muted bg-white dark:bg-gray-900/30'}`}
                           >
-                            <strong>{option.id.toUpperCase()}:</strong> {option.text}
+                            <div className="flex items-start gap-2">
+                              <strong className="text-sm font-semibold min-w-[20px]">{option.id.toUpperCase()}:</strong>
+                              <div className="flex-1 overflow-x-auto">
+                                <BlockMath math={option.text} />
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>

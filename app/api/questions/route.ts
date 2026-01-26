@@ -26,18 +26,53 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const contentType = request.headers.get('content-type') || '';
 
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
+    // If it's multipart (file upload), forward as is
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      
+      // We need to reconstruct a new FormData to send because the incoming one
+      // is bound to the incoming request.
+      const outgoingFormData = new FormData();
+      
+      // Iterate over all entries and append them to the new FormData
+      // @ts-ignore - TS iterator issues with FormData
+      for (const [key, value] of formData.entries()) {
+        outgoingFormData.append(key, value);
+      }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        // Note: DO NOT set 'Content-Type': 'multipart/form-data' manually here.
+        // fetch() will set it automatically with the correct boundary.
+        body: outgoingFormData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Backend API Error (${response.status}):`, errorText);
+        throw new Error(`Backend API returned ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      return NextResponse.json(data);
+    } 
+    
+    // Fallback for JSON requests (if any remain)
+    else {
+      const body = await request.json();
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+      return NextResponse.json(data);
+    }
   } catch (error) {
     console.error('Error creating question:', error);
     return NextResponse.json(

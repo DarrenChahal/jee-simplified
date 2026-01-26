@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { Clock, ChevronLeft, ChevronRight, CheckCircle, HelpCircle, Check } from "lucide-react"
+import { Clock, ChevronLeft, ChevronRight, CheckCircle, HelpCircle, Check, ZoomIn } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,7 @@ import { apiUrls } from '@/environments/prod'
 import { BlockMath } from 'react-katex'
 import 'katex/dist/katex.min.css'
 import { useUser } from "@clerk/nextjs"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 
 // Types based on User Schema (Updated)
 // Types based on User Schema (Updated)
@@ -69,6 +70,7 @@ export default function TakeTestPage() {
 
     // State
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+    const [zoomedImage, setZoomedImage] = useState<string | null>(null)
 
     // Core State: Map of QuestionID -> QuestionState
     const [questionsState, setQuestionsState] = useState<Record<string, QuestionState>>({})
@@ -879,6 +881,29 @@ export default function TakeTestPage() {
                                     <div className="text-sm text-muted-foreground mb-2">
                                         Question {currentQuestionIndex + 1} of {subjectQuestions[currentSubject]?.length || 0}
                                     </div>
+                                    
+                                    {/* Question Images */}
+                                    {currentQ.attachments && currentQ.attachments.length > 0 && (
+                                        <div className="flex flex-col md:flex-row gap-4 mb-6 w-full">
+                                            {currentQ.attachments.map((imgUrl: string, index: number) => (
+                                                <div 
+                                                    key={index} 
+                                                    className="flex-1 relative cursor-zoom-in group" 
+                                                    onClick={() => setZoomedImage(imgUrl)}
+                                                >
+                                                    <img
+                                                        src={imgUrl}
+                                                        alt={`Question attachment ${index + 1}`}
+                                                        className="w-full h-auto rounded-lg border object-contain max-h-[400px] bg-white transition-all group-hover:shadow-md"
+                                                    />
+                                                    <div className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <ZoomIn className="h-4 w-4" />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
                                     <div className="text-xl font-medium">
                                         <BlockMath math={currentQ.question_text} />
                                     </div>
@@ -909,6 +934,21 @@ export default function TakeTestPage() {
                     </Card>
                 </div>
             </main>
+
+            <Dialog open={!!zoomedImage} onOpenChange={(open) => !open && setZoomedImage(null)}>
+                <DialogContent className="max-w-5xl w-full p-1 bg-transparent border-0 shadow-none sm:max-w-[90vw]">
+                    <DialogTitle className="hidden">Zoomed Question Image</DialogTitle>
+                     <div className="relative w-full h-[80vh] flex items-center justify-center pointer-events-none">
+                        {zoomedImage && (
+                            <img 
+                                src={zoomedImage} 
+                                alt="Zoomed Question" 
+                                className="w-auto h-auto max-w-full max-h-full rounded-md shadow-lg pointer-events-auto bg-white" 
+                            />
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

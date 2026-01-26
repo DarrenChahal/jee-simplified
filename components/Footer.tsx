@@ -22,7 +22,7 @@ export function Footer() {
                         <div className="flex items-center gap-2">
                             <BookOpen className="h-5 w-5 text-primary" />
                             <span className="font-medium text-lg">
-                                JEE<span className="text-primary">Simplified</span>
+                                solve<span className="text-primary">IIT</span>
                             </span>
                         </div>
                         <p className="text-sm text-muted-foreground max-w-xs">
