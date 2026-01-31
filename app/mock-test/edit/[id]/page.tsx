@@ -12,8 +12,9 @@ import { Label } from "@/components/ui/label"
 import { toast } from "@/components/ui/use-toast"
 import { BlockMath } from 'react-katex'
 import katex from 'katex'
-import 'katex/dist/katex.min.css'
+import { MarkingSchemeInputs, MarkingScheme } from "@/components/mock-test/MarkingSchemeInputs"
 import { apiUrls } from '@/environments/prod'
+import 'katex/dist/katex.min.css'
 
 // Types
 interface TestDetails {
@@ -26,6 +27,7 @@ interface TestDetails {
     date: string
     time: string
     status: string
+    marking_scheme?: MarkingScheme
 }
 
 interface Question {
@@ -61,7 +63,12 @@ export default function EditTestPage() {
         difficulty: "Medium",
         date: "",
         time: "",
-        status: "draft"
+        status: "draft",
+        marking_scheme: {
+            single_choice: { correct: 4, incorrect: -1 },
+            multi_choice: { correct: 4, incorrect: -1 },
+            input: { correct: 4, incorrect: 0 }
+        }
     })
 
     // Questions state
@@ -114,7 +121,12 @@ export default function EditTestPage() {
                         difficulty: t.difficulty || "Medium",
                         date: dateStr,
                         time: timeStr,
-                        status: t.status || "draft"
+                        status: t.status || "draft",
+                        marking_scheme: t.marking_scheme || {
+                            single_choice: { correct: 4, incorrect: -1 },
+                            multi_choice: { correct: 4, incorrect: -1 },
+                            input: { correct: 4, incorrect: 0 }
+                        }
                     })
                 }
 
@@ -192,7 +204,8 @@ export default function EditTestPage() {
                 test_duration: testDetails.duration,
                 test_date: timestamp,
                 questions: testDetails.questions,
-                status: testDetails.status
+                status: testDetails.status,
+                marking_scheme: testDetails.marking_scheme,
             }
 
             // Update via PUT
@@ -507,6 +520,13 @@ export default function EditTestPage() {
                             <Label>Time</Label>
                             <Input type="time" value={testDetails.time} onChange={e => setTestDetails({ ...testDetails, time: e.target.value })} />
                         </div>
+                    </div>
+
+                    <div className="mt-6">
+                        <MarkingSchemeInputs
+                            value={testDetails.marking_scheme!}
+                            onChange={(newScheme) => setTestDetails({ ...testDetails, marking_scheme: newScheme })}
+                        />
                     </div>
 
                     <div className="mt-8 flex justify-end gap-4">

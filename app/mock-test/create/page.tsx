@@ -15,7 +15,7 @@ import { useTestTemplate, TestDetails } from "../hooks/useTestTemplate"
 import { toast } from "@/components/ui/use-toast"
 import { BlockMath } from 'react-katex'
 import katex from 'katex'
-import 'katex/dist/katex.min.css'
+import { MarkingSchemeInputs, MarkingScheme } from "@/components/mock-test/MarkingSchemeInputs"
 
 // Main page component with Suspense boundary
 export default function CreateTestPage() {
@@ -64,6 +64,11 @@ function CreateTestContent() {
     difficulty: "Medium",
     date: "",
     time: "",
+    marking_scheme: {
+      single_choice: { correct: 4, incorrect: -1 },
+      multi_choice: { correct: 4, incorrect: -1 },
+      input: { correct: 4, incorrect: 0 }
+    }
   })
 
   // Questions state
@@ -142,6 +147,7 @@ function CreateTestContent() {
         max_score: testDetails.questions * 4, // Default score, can be made configurable later
         are_questions_public: false, // Default value
         questions: testDetails.questions, // Number of questions
+        marking_scheme: testDetails.marking_scheme,
       };
 
       // Send the request to the backend using our new API route
@@ -671,7 +677,7 @@ function CreateTestContent() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             <div className="space-y-2">
               <Label htmlFor="test-date">Test Date</Label>
               <Input
@@ -691,6 +697,13 @@ function CreateTestContent() {
                 onChange={(e) => setTestDetails({ ...testDetails, time: e.target.value })}
               />
             </div>
+          </div>
+
+          <div className="mt-6">
+            <MarkingSchemeInputs
+              value={testDetails.marking_scheme!}
+              onChange={(newScheme) => setTestDetails({ ...testDetails, marking_scheme: newScheme })}
+            />
           </div>
 
           <div className="mt-8 flex justify-between">
