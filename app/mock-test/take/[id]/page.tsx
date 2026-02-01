@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { Clock, ChevronLeft, ChevronRight, CheckCircle, HelpCircle, Check, ZoomIn } from "lucide-react"
+import { Clock, ChevronLeft, ChevronRight, ChevronDown, CheckCircle, HelpCircle, Check, ZoomIn } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Input } from "@/components/ui/input"
@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 // Types based on User Schema (Updated)
 // Types based on User Schema (Updated)
 type AnswerStatus = 'skip' | 'answered' | 'review' | 'review-answered';
-type QuestionType = 'input' | 'single_choice' | 'multi-select';
+type QuestionType = 'integer' | 'single_choice' | 'multi_choice';
 type InternalStatus = 'none' | 'answered' | 'skipped' | 'review' | 'review-answered';
 
 interface SolvedDuringTest {
@@ -42,7 +42,8 @@ interface AnswerPayload {
     answer: UserAnswer;
     submittedAt: number;
     question_type: QuestionType;
-    verdict: 'nothing'; // 'unverified' per req, but schema says 'verdict' types. keeping 'nothing' to avoid break if schema is stricter, or check schema again. user req says 'unverified'. sticking to current working 'nothing' unless user insists or I see schema.
+    verdict: 'nothing'; // 'unverified' per req, but sch
+    // ema says 'verdict' types. keeping 'nothing' to avoid break if schema is stricter, or check schema again. user req says 'unverified'. sticking to current working 'nothing' unless user insists or I see schema.
     analysis_sheet_id?: string;
 }
 
@@ -71,6 +72,7 @@ export default function TakeTestPage() {
     // State
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
     const [zoomedImage, setZoomedImage] = useState<string | null>(null)
+    const [expandedSection, setExpandedSection] = useState<string | null>(null)
 
     // Core State: Map of QuestionID -> QuestionState
     const [questionsState, setQuestionsState] = useState<Record<string, QuestionState>>({})
@@ -97,6 +99,15 @@ export default function TakeTestPage() {
             setUserId(user.primaryEmailAddress.emailAddress);
         }
     }, [user]);
+
+    // Sync Question Palette with Navigation (Auto-Expand)
+    useEffect(() => {
+        if (!currentSubject || !subjectQuestions[currentSubject]) return;
+        const currentQ = subjectQuestions[currentSubject][currentQuestionIndex];
+        if (currentQ && currentQ.type) {
+             setExpandedSection(currentQ.type);
+        }
+    }, [currentQuestionIndex, currentSubject, subjectQuestions]);
 
     // Fetch test details and questions
     useEffect(() => {
@@ -172,6 +183,11 @@ export default function TakeTestPage() {
                     }
 
                     if (fetchedQuestions.length > 0) {
+                        // Deduplicate questions to prevent UI repetitions
+                        const uniqueMap = new Map();
+                        fetchedQuestions.forEach((q: any) => uniqueMap.set(q._id, q));
+                        fetchedQuestions = Array.from(uniqueMap.values());
+
                         setQuestions(fetchedQuestions)
 
                         const initialQuestionsState: Record<string, QuestionState> = {}
@@ -179,11 +195,25 @@ export default function TakeTestPage() {
                         const subjectList: string[] = []
 
                         fetchedQuestions.forEach((q: any) => {
+                            console.log(`[Debug] Question ID: ${q._id}, Raw Type: ${q.type}`);
                             const subject = q.subjects && q.subjects.length > 0 ? q.subjects[0] : 'General'
                             if (!segregated[subject]) {
                                 segregated[subject] = []
                                 subjectList.push(subject)
                             }
+                            
+                            // Normalize type for grouping/sorting (mapping DB types to strict UI types)
+                            // CHECK BOTH ROOTS: q.type (legacy) AND q.answer.type (new schema)
+                            const rawType = q.type || q.answer?.type;
+                            console.log(`[Debug] Question ID: ${q._id}, Resolved Type: ${rawType}`);
+
+                            let normalizedType = 'single_choice';
+                            if (rawType === 'input' || rawType === 'integer') normalizedType = 'integer';
+                            else if (rawType === 'multi-select' || rawType === 'multi_choice' || rawType === 'multiple_choice') normalizedType = 'multi_choice';
+                            else normalizedType = 'single_choice';
+                            
+                            q.type = normalizedType; // Mutate for UI consistency
+                            
                             segregated[subject].push(q)
 
                             // Initialize State
@@ -196,6 +226,18 @@ export default function TakeTestPage() {
                                 syncStatus: 'synced'
                             }
                         })
+                        
+                        // Sort questions within each subject: single_choice -> multi_choice -> integer
+                        Object.keys(segregated).forEach(subj => {
+                            segregated[subj].sort((a, b) => {
+                                const typeOrder: Record<string, number> = {
+                                    'single_choice': 1,
+                                    'multi_choice': 2,
+                                    'integer': 3
+                                };
+                                return (typeOrder[a.type] || 99) - (typeOrder[b.type] || 99);
+                            });
+                        });
 
                         setQuestionsState(initialQuestionsState)
                         setSubjectQuestions(segregated)
@@ -507,7 +549,7 @@ export default function TakeTestPage() {
             time_taken: Math.round(newTimeSpent / 1000), // CUMULATIVE time in seconds
             answer: payloadAnswer,
             submittedAt: Date.now(),
-            question_type: (currentQ.type === 'single-select' ? 'single_choice' : currentQ.type) || 'single_choice',
+            question_type: (currentQ.type as QuestionType) || 'single_choice',
             verdict: 'nothing'
         };
 
@@ -521,8 +563,12 @@ export default function TakeTestPage() {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                console.error("Failed to save answer", errorData);
-
+                console.error("Sync failed:", errorData);
+                toast({
+                     title: "Backend Error",
+                     description: errorData.message || JSON.stringify(errorData),
+                     variant: "destructive"
+                });
                 // Update sync status to error
                 setQuestionsState(prev => ({
                     ...prev,
@@ -653,70 +699,85 @@ export default function TakeTestPage() {
         }
     }
 
+    const getSectionName = (type: string) => {
+        switch (type) {
+            case 'single_choice': return "Section 1: Single Correct Answer Type";
+            case 'multi_choice': return "Section 2: Multiple Correct Answer Type";
+            case 'integer': return "Section 3: Integer Type";
+            default: return "Section: General";
+        }
+    };
+
     const renderQuestionInput = () => {
         if (!currentQ) return null;
 
         const qType = currentQ.type || 'single_choice';
 
-        if (qType === 'input') {
-            return (
-                <div className="space-y-4">
-                    <Label htmlFor="answer-input">Your Answer</Label>
-                    <Input
-                        id="answer-input"
-                        placeholder="Type your answer here..."
-                        value={questionsState[currentQ._id]?.answer?.input || ''}
-                        onChange={(e) => handleInput(e.target.value)}
-                    />
-                </div>
-            )
-        }
-
-        if (qType === 'multi-select') {
-            return (
-                <div className="space-y-4">
-                    {currentQ.answer.options.map((option: string, idx: number) => {
-                        const isSelected = questionsState[currentQ._id]?.answer?.selected_options?.includes(idx);
-                        return (
-                            <div key={idx}
-                                className={`flex items-center space-x-2 rounded-md border p-3 hover:bg-muted/50 cursor-pointer ${isSelected ? 'border-primary bg-primary/5' : ''}`}
-                                onClick={() => handleMultiSelect(idx)}
-                            >
-                                <div className={`h-4 w-4 rounded border flex items-center justify-center ${isSelected ? 'bg-primary border-primary' : 'border-muted-foreground'}`}>
-                                    {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
-                                </div>
-                                <Label className="flex-1 cursor-pointer">
-                                    <BlockMath math={option} />
-                                </Label>
-                            </div>
-                        )
-                    })}
-                </div>
-            )
-        }
-
         return (
-            <RadioGroup
-                value={questionsState[currentQ._id]?.answer?.selected_option !== undefined ? currentQ.answer.options[questionsState[currentQ._id]!.answer.selected_option!] : undefined}
-                className="space-y-4"
-                onValueChange={() => { }} // Controlled but handled by parent click
-            >
-                {currentQ.answer.options.map((option: string, idx: number) => {
-                    const isSelected = questionsState[currentQ._id]?.answer?.selected_option === idx;
-                    return (
-                        <div key={idx}
-                            className={`flex items-center space-x-2 rounded-md border p-3 hover:bg-muted/50 cursor-pointer ${isSelected ? 'border-primary bg-primary/5' : ''}`}
-                            onClick={() => handleSingleSelect(idx)}
-                        >
-                            <RadioGroupItem value={option} id={`opt-${idx}`} className="pointer-events-none" />
-                            <Label htmlFor={`option-${idx}`} className="flex-1 cursor-pointer pointer-events-none">
-                                <BlockMath math={option} />
-                            </Label>
-                        </div>
-                    )
-                })}
-            </RadioGroup>
-        )
+            <div className="space-y-6">
+                <div className="bg-muted/30 p-3 rounded-md border text-sm font-medium text-muted-foreground mb-4">
+                    {getSectionName(qType)}
+                </div>
+
+                {qType === 'integer' && (
+                    <div className="space-y-4">
+                        <Label htmlFor="answer-input">Your Answer (Integer)</Label>
+                        <Input
+                            id="answer-input"
+                            type="number"
+                            placeholder="Type your answer here..."
+                            value={questionsState[currentQ._id]?.answer?.input || ''}
+                            onChange={(e) => handleInput(e.target.value)}
+                        />
+                    </div>
+                )}
+
+                {qType === 'multi_choice' && (
+                    <div className="space-y-4">
+                        <Label className="text-base font-semibold mb-2 block">Select all correct options:</Label>
+                        {Array.isArray(currentQ.answer?.options) && currentQ.answer.options.map((option: string, idx: number) => {
+                            const isSelected = questionsState[currentQ._id]?.answer?.selected_options?.includes(idx);
+                            return (
+                                <div key={idx}
+                                    className={`flex items-center space-x-2 rounded-md border p-3 hover:bg-muted/50 cursor-pointer ${isSelected ? 'border-primary bg-primary/5' : ''}`}
+                                    onClick={() => handleMultiSelect(idx)}
+                                >
+                                    <div className={`h-4 w-4 rounded border flex items-center justify-center ${isSelected ? 'bg-primary border-primary' : 'border-muted-foreground'}`}>
+                                        {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                                    </div>
+                                    <Label className="flex-1 cursor-pointer">
+                                        <BlockMath math={option} />
+                                    </Label>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+
+                {qType === 'single_choice' && (
+                    <RadioGroup
+                        value={questionsState[currentQ._id]?.answer?.selected_option !== undefined ? currentQ.answer.options[questionsState[currentQ._id]!.answer.selected_option!] : undefined}
+                        className="space-y-4"
+                        onValueChange={() => { }} // Controlled by parent
+                    >
+                        {Array.isArray(currentQ.answer?.options) && currentQ.answer.options.map((option: string, idx: number) => {
+                            const isSelected = questionsState[currentQ._id]?.answer?.selected_option === idx;
+                            return (
+                                <div key={idx}
+                                    className={`flex items-center space-x-2 rounded-md border p-3 hover:bg-muted/50 cursor-pointer ${isSelected ? 'border-primary bg-primary/5' : ''}`}
+                                    onClick={() => handleSingleSelect(idx)}
+                                >
+                                    <RadioGroupItem value={option} id={`opt-${idx}`} className="pointer-events-none" />
+                                    <Label htmlFor={`option-${idx}`} className="flex-1 cursor-pointer pointer-events-none">
+                                        <BlockMath math={option} />
+                                    </Label>
+                                </div>
+                            )
+                        })}
+                    </RadioGroup>
+                )}
+            </div>
+        );
     }
 
     const handleSubmitTest = async () => {
@@ -839,23 +900,58 @@ export default function TakeTestPage() {
                 <div className="grid md:grid-cols-[300px_1fr] gap-6">
                     <Card className="p-4 h-fit">
                         <h2 className="font-medium mb-4">Question Navigator - {currentSubject}</h2>
-                        <div className="grid grid-cols-5 gap-2 mb-6">
-                            {subjectQuestions[currentSubject]?.map((q, index) => {
-                                const status = questionsState[q._id]?.marked_as;
-                                const isCurrent = currentQuestionIndex === index;
-                                const statusClass = getQuestionStatusColor(q._id);
+                        <div className="space-y-4 mb-6 overflow-y-auto max-h-[60vh] pr-1 scrollbar-thin">
+                            {['single_choice', 'multi_choice', 'integer'].map((type) => {
+                                const subjectQs = subjectQuestions[currentSubject] || [];
+                                const typeQuestions = subjectQs
+                                    .map((q, i) => ({ ...q, originalIndex: i }))
+                                    .filter((q: any) => q.type === type);
+                                
+                                if (typeQuestions.length === 0) return null;
+
+                                const isOpen = expandedSection === type;
+                                let sectionTitle = "";
+                                switch (type) {
+                                     case 'single_choice': sectionTitle = "Section 1: Single Correct"; break;
+                                     case 'multi_choice': sectionTitle = "Section 2: Multiple Correct"; break;
+                                     case 'integer': sectionTitle = "Section 3: Integer Type"; break;
+                                }
 
                                 return (
-                                    <button
-                                        key={q._id}
-                                        onClick={() => handleJumpToQuestion(index)}
-                                        className={`flex items-center justify-center h-10 w-10 rounded-md text-sm font-medium transition-colors border ${isCurrent ? "ring-2 ring-primary ring-offset-2" : ""} ${statusClass} relative`}
-                                    >
-                                        {index + 1}
-                                        {status === 'review-answered' && (
-                                            <div className="absolute top-1 right-1 h-2 w-2 rounded-full bg-green-500"></div>
-                                        )}
-                                    </button>
+                                    <div key={type} className="group">
+                                        <button 
+                                            onClick={() => setExpandedSection(prev => prev === type ? null : type)}
+                                            className={`w-full flex items-center justify-between cursor-pointer p-3 rounded-md border text-xs font-semibold uppercase select-none mb-3 transition-all duration-200 ${isOpen ? 'bg-blue-600 text-white border-blue-700 shadow-md' : 'bg-muted/40 text-muted-foreground border-transparent hover:bg-muted'}`}
+                                        >
+                                            <span>{sectionTitle} ({typeQuestions.length})</span>
+                                            <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+                                        <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                                            <div className="overflow-hidden">
+                                                <div className="grid grid-cols-5 gap-3 pb-2 px-2 pt-4">
+                                                    {typeQuestions.map((item: any) => {
+                                                         const index = item.originalIndex;
+                                                         const status = questionsState[item._id]?.marked_as;
+                                                         const isCurrent = currentQuestionIndex === index;
+                                                         const statusClass = getQuestionStatusColor(item._id);
+                    
+                                                         return (
+                                                            <button
+                                                                key={item._id}
+                                                                onClick={() => handleJumpToQuestion(index)}
+                                                                className={`flex items-center justify-center h-10 w-10 rounded-md text-sm font-medium transition-colors border ${isCurrent ? "ring-2 ring-primary ring-offset-2" : ""} ${statusClass} relative`}
+                                                            >
+                                                                {index + 1}
+                                                                {status === 'review-answered' && (
+                                                                    <div className="absolute top-1 right-1 h-2 w-2 rounded-full bg-green-500"></div>
+                                                                )}
+                                                            </button>
+                                                         )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 )
                             })}
                         </div>
