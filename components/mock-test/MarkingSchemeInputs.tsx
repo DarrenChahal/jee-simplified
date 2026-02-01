@@ -17,7 +17,7 @@ import { Settings2, CheckCircle2, ListChecks, Type } from "lucide-react"
 export type MarkingScheme = {
   single_choice: { correct: number; incorrect: number }
   multi_choice: { correct: number; incorrect: number }
-  input: { correct: number; incorrect: number }
+  integer: { correct: number; incorrect: number }
 }
 
 interface MarkingSchemeInputsProps {
@@ -95,9 +95,9 @@ export function MarkingSchemeInputs({ value, onChange }: MarkingSchemeInputsProp
                         <div className="h-px bg-border" />
                     <SchemeRow 
                         icon={<Type className="w-4 h-4 text-orange-500" />}
-                        title="Integer / Input"
-                        values={buffer.input}
-                        onChange={(f, v) => handleBufferChange("input", f, v)}
+                        title="Integer Type"
+                        values={buffer.integer}
+                        onChange={(f, v) => handleBufferChange("integer", f, v)}
                     />
                 </div>
             </div>
@@ -158,11 +158,11 @@ function SchemeRow({
 const valueToBuffer = (v: MarkingScheme) => ({
   single_choice: { correct: v.single_choice.correct.toString(), incorrect: v.single_choice.incorrect.toString() },
   multi_choice: { correct: v.multi_choice.correct.toString(), incorrect: v.multi_choice.incorrect.toString() },
-  input: { correct: v.input.correct.toString(), incorrect: v.input.incorrect.toString() },
+  integer: { correct: v.integer.correct.toString(), incorrect: v.integer.incorrect.toString() },
 })
 
 const bufferToValue = (b: ReturnType<typeof valueToBuffer>): MarkingScheme => ({
   single_choice: { correct: parseFloat(b.single_choice.correct) || 0, incorrect: parseFloat(b.single_choice.incorrect) || 0 },
   multi_choice: { correct: parseFloat(b.multi_choice.correct) || 0, incorrect: parseFloat(b.multi_choice.incorrect) || 0 },
-  input: { correct: parseFloat(b.input.correct) || 0, incorrect: parseFloat(b.input.incorrect) || 0 },
+  integer: { correct: parseFloat(b.integer.correct) || 0, incorrect: parseFloat(b.integer.incorrect) || 0 },
 })

@@ -16,7 +16,7 @@ export type TestTemplate = {
 export type MarkingScheme = {
   single_choice: { correct: number; incorrect: number }
   multi_choice: { correct: number; incorrect: number }
-  input: { correct: number; incorrect: number }
+  integer: { correct: number; incorrect: number }
 }
 
 export type TestDetails = {

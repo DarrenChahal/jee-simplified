@@ -68,7 +68,7 @@ function CreateTestContent() {
     marking_scheme: {
       single_choice: { correct: 4, incorrect: -1 },
       multi_choice: { correct: 4, incorrect: -1 },
-      input: { correct: 4, incorrect: 0 }
+      integer: { correct: 4, incorrect: 0 }
     }
   })
 
@@ -485,7 +485,14 @@ function CreateTestContent() {
     setIsSubmitting(true);
 
     try {
-      // Update test status from draft to scheduled using our new API route
+      // Calculate actual max score based on added questions
+      const calculatedMaxScore = questions.reduce((total, q) => {
+        // Safe access to marking scheme for the question type
+        const typeScheme = testDetails.marking_scheme?.[q.type as keyof typeof testDetails.marking_scheme];
+        return total + (typeScheme?.correct || 0);
+      }, 0);
+
+      // Update test status and max_score using our new API route
       const updateResponse = await fetch('/api/tests', {
         method: 'PUT',
         headers: {
@@ -493,7 +500,8 @@ function CreateTestContent() {
         },
         body: JSON.stringify({
           _id: testId,
-          status: 'scheduled'
+          status: 'scheduled',
+          max_score: calculatedMaxScore
         })
       });
 
