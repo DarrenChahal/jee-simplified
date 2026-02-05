@@ -13,6 +13,12 @@ export type TestTemplate = {
   };
 };
 
+export type MarkingScheme = {
+  single_choice: { correct: number; incorrect: number }
+  multi_choice: { correct: number; incorrect: number }
+  integer: { correct: number; incorrect: number }
+}
+
 export type TestDetails = {
   title: string;
   description: string;
@@ -22,6 +28,7 @@ export type TestDetails = {
   difficulty: string;
   date: string;
   time: string;
+  marking_scheme?: MarkingScheme;
 };
 
 export function useTestTemplate() {

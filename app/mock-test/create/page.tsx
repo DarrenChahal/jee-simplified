@@ -15,7 +15,7 @@ import { useTestTemplate, TestDetails } from "../hooks/useTestTemplate"
 import { toast } from "@/components/ui/use-toast"
 import { BlockMath } from 'react-katex'
 import katex from 'katex'
-import 'katex/dist/katex.min.css'
+import { MarkingSchemeInputs, MarkingScheme } from "@/components/mock-test/MarkingSchemeInputs"
 
 // Main page component with Suspense boundary
 export default function CreateTestPage() {
@@ -53,6 +53,7 @@ function CreateTestContent() {
 
   // States for multi-step form
   const [activeStep, setActiveStep] = useState(1)
+  const [addQuestionStep, setAddQuestionStep] = useState<'type-selection' | 'details'>('type-selection')
 
   // Test details state
   const [testDetails, setTestDetails] = useState<TestDetails & { subject: string[] }>({
@@ -64,14 +65,21 @@ function CreateTestContent() {
     difficulty: "Medium",
     date: "",
     time: "",
+    marking_scheme: {
+      single_choice: { correct: 4, incorrect: -1 },
+      multi_choice: { correct: 4, incorrect: -1 },
+      integer: { correct: 4, incorrect: 0 }
+    }
   })
 
   // Questions state
   const [questions, setQuestions] = useState<{
     text: string;
+    type: 'single_choice' | 'multi_choice' | 'integer';
     images?: string[];
     options: { id: string; text: string }[];
-    correctAnswer: string;
+    correctAnswer: string | string[]; // string for single/integer, string[] for multi
+    numericalAnswer?: string; // for integer type display/handling
     for_class?: string[];
     subjects?: string[];
     topics?: string[];
@@ -81,6 +89,7 @@ function CreateTestContent() {
   // Current editing question
   const [currentQuestion, setCurrentQuestion] = useState({
     text: "",
+    type: 'single_choice' as 'single_choice' | 'multi_choice' | 'integer',
     options: [
       { id: "a", text: "" },
       { id: "b", text: "" },
@@ -89,7 +98,8 @@ function CreateTestContent() {
     ],
     images: [] as string[], // Stores the URLs from backend (for editing/display)
     newFiles: [] as { file: File, preview: string }[], // Stores new files to upload
-    correctAnswer: "a",
+    correctAnswer: "a" as string | string[], // Default for single choice
+    numericalAnswer: "",
     for_class: ["11"],
     subjects: ["Physics"],
     topics: [] as string[],
@@ -142,6 +152,7 @@ function CreateTestContent() {
         max_score: testDetails.questions * 4, // Default score, can be made configurable later
         are_questions_public: false, // Default value
         questions: testDetails.questions, // Number of questions
+        marking_scheme: testDetails.marking_scheme,
       };
 
       // Send the request to the backend using our new API route
@@ -190,11 +201,21 @@ function CreateTestContent() {
 
   // Add or update question
   const handleAddQuestion = async () => {
-    // Validate question
-    if (!currentQuestion.text || currentQuestion.options.some(opt => !opt.text)) {
+    // Validate question based on type
+    if (!currentQuestion.text) {
       toast({
         title: "Missing information",
-        description: "Please fill in all fields",
+        description: "Please enter question text",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate options for non-integer types
+    if (currentQuestion.type !== 'integer' && currentQuestion.options.some(opt => !opt.text)) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all option fields",
         variant: "destructive"
       });
       return;
@@ -210,18 +231,36 @@ function CreateTestContent() {
       return;
     }
 
-    const correctOption = currentQuestion.options.find(opt => opt.id === currentQuestion.correctAnswer);
-    if (!correctOption) {
-      toast({
-        title: "Error",
-        description: "Correct option not found",
-        variant: "destructive"
-      });
-      return;
+    // Validate Answer
+    if (currentQuestion.type === 'single_choice') {
+      const correctOption = currentQuestion.options.find(opt => opt.id === currentQuestion.correctAnswer);
+      if (!correctOption) {
+        toast({
+          title: "Error",
+          description: "Correct option not found",
+          variant: "destructive"
+        });
+        return;
+      }
+    } else if (currentQuestion.type === 'multi_choice') {
+      if (!Array.isArray(currentQuestion.correctAnswer) || currentQuestion.correctAnswer.length === 0) {
+        toast({
+          title: "Error",
+          description: "Please select at least one correct option",
+          variant: "destructive"
+        });
+        return;
+      }
+    } else if (currentQuestion.type === 'integer') {
+      if (!currentQuestion.numericalAnswer) {
+        toast({
+           title: "Error",
+           description: "Please enter the numerical answer",
+           variant: "destructive"
+        });
+        return;
+      }
     }
-
-    // Get the index of the correct option (0 for A, 1 for B, etc.)
-    const correctOptionIndex = currentQuestion.options.findIndex(opt => opt.id === currentQuestion.correctAnswer);
 
     // Get subjects as array
     const subjects = Array.isArray(testDetails.subject)
@@ -249,12 +288,36 @@ function CreateTestContent() {
       test_id: testId
     }));
 
-    // Answer
-    formData.append('answer', JSON.stringify({
-      type: "single_choice",
-      options: currentQuestion.options.map(opt => opt.text),
-      correct_answer: correctOptionIndex.toString()
-    }));
+    // Construct Answer Payload based on Type
+    let answerPayload: any = { type: currentQuestion.type };
+
+    if (currentQuestion.type === 'single_choice') {
+      const correctOptionIndex = currentQuestion.options.findIndex(opt => opt.id === currentQuestion.correctAnswer);
+      answerPayload = {
+        type: "single_choice",
+        options: currentQuestion.options.map(opt => opt.text),
+        correct_answer: correctOptionIndex.toString()
+      };
+    } else if (currentQuestion.type === 'multi_choice') {
+      const correctIndices = (currentQuestion.correctAnswer as string[])
+        .map(ans => currentQuestion.options.findIndex(opt => opt.id === ans))
+        .sort((a, b) => a - b)
+        .map(String);
+      
+      answerPayload = {
+        type: "multi_choice",
+        options: currentQuestion.options.map(opt => opt.text),
+        correct_answer: correctIndices // Array of strings e.g. ["0", "2"]
+      };
+    } else if (currentQuestion.type === 'integer') {
+      answerPayload = {
+        type: "integer",
+        options: [], // No options for integer
+        correct_answer: currentQuestion.numericalAnswer || "0"
+      };
+    }
+
+    formData.append('answer', JSON.stringify(answerPayload));
 
     formData.append('status', "active");
     formData.append('created_by', user?.primaryEmailAddress?.emailAddress || "test@jeesimplified.com");
@@ -304,9 +367,11 @@ function CreateTestContent() {
     // Prepare local question data
     const questionData = {
       text: currentQuestion.text,
+      type: currentQuestion.type,
       images: savedImages.length > 0 ? savedImages : currentQuestion.images, // Use backend URLs
-      options: [...currentQuestion.options],
+      options: currentQuestion.type === 'integer' ? [] : [...currentQuestion.options],
       correctAnswer: currentQuestion.correctAnswer,
+      numericalAnswer: currentQuestion.numericalAnswer,
       for_class: currentQuestion.for_class,
       subjects: currentQuestion.subjects,
       topics: currentQuestion.topics,
@@ -339,6 +404,7 @@ function CreateTestContent() {
   const resetQuestionForm = () => {
     setCurrentQuestion({
       text: "",
+      type: 'single_choice',
       options: [
         { id: "a", text: "" },
         { id: "b", text: "" },
@@ -346,6 +412,7 @@ function CreateTestContent() {
         { id: "d", text: "" },
       ],
       correctAnswer: "a",
+      numericalAnswer: "",
       images: [],
       newFiles: [],
       for_class: ["11"],
@@ -355,6 +422,7 @@ function CreateTestContent() {
       isEditMode: false,
       editIndex: -1
     })
+    setAddQuestionStep('type-selection');
   }
 
   // Edit a question
@@ -364,6 +432,15 @@ function CreateTestContent() {
       ...question,
       images: question.images || ((question as any).image ? [(question as any).image] : []), // Handle legacy single image
       newFiles: [],
+      type: question.type || 'single_choice',
+      options: question.options.length > 0 ? question.options : [
+        { id: "a", text: "" },
+        { id: "b", text: "" },
+        { id: "c", text: "" },
+        { id: "d", text: "" },
+      ], // Fallback if no options (e.g. integer type being converted?)
+      correctAnswer: question.correctAnswer,
+      numericalAnswer: question.numericalAnswer || "",
       for_class: question.for_class || ["11"],
       subjects: question.subjects || ["Physics"],
       topics: question.topics || [],
@@ -371,6 +448,7 @@ function CreateTestContent() {
       isEditMode: true,
       editIndex: index
     })
+    setAddQuestionStep('details');
   }
 
   // Delete a question
@@ -407,7 +485,14 @@ function CreateTestContent() {
     setIsSubmitting(true);
 
     try {
-      // Update test status from draft to scheduled using our new API route
+      // Calculate actual max score based on added questions
+      const calculatedMaxScore = questions.reduce((total, q) => {
+        // Safe access to marking scheme for the question type
+        const typeScheme = testDetails.marking_scheme?.[q.type as keyof typeof testDetails.marking_scheme];
+        return total + (typeScheme?.correct || 0);
+      }, 0);
+
+      // Update test status and max_score using our new API route
       const updateResponse = await fetch('/api/tests', {
         method: 'PUT',
         headers: {
@@ -415,7 +500,8 @@ function CreateTestContent() {
         },
         body: JSON.stringify({
           _id: testId,
-          status: 'scheduled'
+          status: 'scheduled',
+          max_score: calculatedMaxScore
         })
       });
 
@@ -671,7 +757,7 @@ function CreateTestContent() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             <div className="space-y-2">
               <Label htmlFor="test-date">Test Date</Label>
               <Input
@@ -691,6 +777,13 @@ function CreateTestContent() {
                 onChange={(e) => setTestDetails({ ...testDetails, time: e.target.value })}
               />
             </div>
+          </div>
+
+          <div className="mt-6">
+            <MarkingSchemeInputs
+              value={testDetails.marking_scheme!}
+              onChange={(newScheme) => setTestDetails({ ...testDetails, marking_scheme: newScheme })}
+            />
           </div>
 
           <div className="mt-8 flex justify-between">
@@ -748,7 +841,7 @@ function CreateTestContent() {
                           )}
                         </td>
                         <td className="px-4 py-4 w-32">
-                          Option {question.correctAnswer.toUpperCase()}
+                          Option {Array.isArray(question.correctAnswer) ? (question.correctAnswer as string[]).join(', ').toUpperCase() : (question.correctAnswer as string).toUpperCase()}
                         </td>
                         <td className="px-4 py-4 w-32">
                           <div className="flex gap-2">
@@ -807,31 +900,103 @@ function CreateTestContent() {
                 <div className="flex justify-between items-center">
                   <h3 className="font-semibold">
                     {currentQuestion.isEditMode ? "Edit Question" : "Add New Question"}
+                    {!currentQuestion.isEditMode && addQuestionStep === 'details' && (
+                        <span className="ml-2 text-sm font-normal text-muted-foreground">
+                            ({currentQuestion.type === 'single_choice' ? 'Single Correct' : 
+                              currentQuestion.type === 'multi_choice' ? 'Multiple Correct' : 'Integer Type'})
+                        </span>
+                    )}
                   </h3>
+                  {addQuestionStep === 'details' && !currentQuestion.isEditMode && (
+                      <Button variant="ghost" size="sm" onClick={() => setAddQuestionStep('type-selection')}>
+                          Change Type
+                      </Button>
+                  )}
                 </div>
+
+                {addQuestionStep === 'type-selection' && !currentQuestion.isEditMode ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <Card 
+                            className="p-6 cursor-pointer hover:border-blue-600 hover:bg-blue-600 hover:text-white transition-all flex flex-col items-center justify-center text-center gap-3 group"
+                            onClick={() => {
+                                setCurrentQuestion(prev => ({
+                                    ...prev, 
+                                    type: 'single_choice', 
+                                    correctAnswer: 'a'
+                                }));
+                                setAddQuestionStep('details');
+                            }}
+                        >
+                            <div>
+                                <h4 className="font-semibold">Single Correct</h4>
+                                <p className="text-sm text-muted-foreground group-hover:text-blue-100">Traditional multiple choice with one correct answer</p>
+                            </div>
+                        </Card>
+
+                        <Card 
+                            className="p-6 cursor-pointer hover:border-blue-600 hover:bg-blue-600 hover:text-white transition-all flex flex-col items-center justify-center text-center gap-3 group"
+                            onClick={() => {
+                                setCurrentQuestion(prev => ({
+                                    ...prev, 
+                                    type: 'multi_choice', 
+                                    correctAnswer: [] as string[]
+                                }));
+                                setAddQuestionStep('details');
+                            }}
+                        >
+                            <div>
+                                <h4 className="font-semibold">Multiple Correct</h4>
+                                <p className="text-sm text-muted-foreground group-hover:text-blue-100">Multiple choice where more than one option can be correct</p>
+                            </div>
+                        </Card>
+
+                        <Card 
+                            className="p-6 cursor-pointer hover:border-blue-600 hover:bg-blue-600 hover:text-white transition-all flex flex-col items-center justify-center text-center gap-3 group"
+                            onClick={() => {
+                                setCurrentQuestion(prev => ({
+                                    ...prev, 
+                                    type: 'integer',
+                                    correctAnswer: '' // Not really used for integer but keeping consistent type
+                                }));
+                                setAddQuestionStep('details');
+                            }}
+                        >
+                            <div>
+                                <h4 className="font-semibold">Integer Type</h4>
+                                <p className="text-sm text-muted-foreground group-hover:text-blue-100">Questions with a numerical valid answer input</p>
+                            </div>
+                        </Card>
+                    </div>
+                ) : (
+                    <>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Class Selection */}
                   <div className="space-y-2">
                     <Label>Class</Label>
                     <div className="flex flex-wrap gap-2">
-                      {["11", "12", "dropper"].map((cls) => (
-                        <div key={cls} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id={`class-${cls}`}
-                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                            checked={currentQuestion.for_class?.includes(cls)}
-                            onChange={(e) => {
-                              const updatedClass = e.target.checked
-                                ? [...(currentQuestion.for_class || []), cls]
-                                : (currentQuestion.for_class || []).filter(c => c !== cls);
+                      {["11", "12", "dropper"].map((cls) => {
+                         const isSelected = currentQuestion.for_class?.includes(cls);
+                         return (
+                        <div 
+                          key={cls} 
+                          onClick={() => {
+                              const updatedClass = isSelected
+                                ? (currentQuestion.for_class || []).filter(c => c !== cls)
+                                : [...(currentQuestion.for_class || []), cls];
                               setCurrentQuestion({ ...currentQuestion, for_class: updatedClass });
-                            }}
-                          />
-                          <Label htmlFor={`class-${cls}`} className="text-sm font-normal capitalize">{cls}</Label>
+                          }}
+                          className={`
+                            cursor-pointer px-4 py-2 rounded-full border transition-all text-sm font-medium capitalize
+                            ${isSelected 
+                              ? 'bg-primary/10 border-primary text-primary hover:bg-primary/20' 
+                              : 'bg-background border-muted hover:border-gray-400 text-muted-foreground'
+                            }
+                          `}
+                        >
+                          {cls}
                         </div>
-                      ))}
+                      )})}
                     </div>
                   </div>
 
@@ -839,23 +1004,28 @@ function CreateTestContent() {
                   <div className="space-y-2">
                     <Label>Subject</Label>
                     <div className="flex flex-wrap gap-2">
-                      {["Physics", "Chemistry", "Mathematics"].map((sub) => (
-                        <div key={sub} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id={`subject-${sub}`}
-                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                            checked={currentQuestion.subjects?.includes(sub)}
-                            onChange={(e) => {
-                              const updatedSubjects = e.target.checked
-                                ? [...(currentQuestion.subjects || []), sub]
-                                : (currentQuestion.subjects || []).filter(s => s !== sub);
+                      {["Physics", "Chemistry", "Mathematics"].map((sub) => {
+                        const isSelected = currentQuestion.subjects?.includes(sub);
+                        return (
+                        <div 
+                          key={sub} 
+                          onClick={() => {
+                              const updatedSubjects = isSelected
+                                ? (currentQuestion.subjects || []).filter(s => s !== sub)
+                                : [...(currentQuestion.subjects || []), sub];
                               setCurrentQuestion({ ...currentQuestion, subjects: updatedSubjects });
-                            }}
-                          />
-                          <Label htmlFor={`subject-${sub}`} className="text-sm font-normal">{sub}</Label>
+                          }}
+                          className={`
+                            cursor-pointer px-4 py-2 rounded-full border transition-all text-sm font-medium
+                            ${isSelected 
+                              ? 'bg-primary/10 border-primary text-primary hover:bg-primary/20' 
+                              : 'bg-background border-muted hover:border-gray-400 text-muted-foreground'
+                            }
+                          `}
+                        >
+                          {sub}
                         </div>
-                      ))}
+                      )})}
                     </div>
                   </div>
                 </div>
@@ -1173,6 +1343,7 @@ function CreateTestContent() {
                     )}
                   </div>
                 </div>
+                {currentQuestion.type !== 'integer' && (
                 <div className="space-y-4">
                   <Label>Answer Options</Label>
                   {currentQuestion.options.map((option, index) => (
@@ -1212,28 +1383,107 @@ function CreateTestContent() {
                     </div>
                   ))}
                 </div>
-
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="correct-answer">Correct Answer</Label>
-                  <Select
-                    value={currentQuestion.correctAnswer}
-                    onValueChange={(value) => setCurrentQuestion({
-                      ...currentQuestion,
-                      correctAnswer: value
-                    })}
-                  >
-                    <SelectTrigger id="correct-answer">
-                      <SelectValue placeholder="Select correct answer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="a">Option A</SelectItem>
-                      <SelectItem value="b">Option B</SelectItem>
-                      <SelectItem value="c">Option C</SelectItem>
-                      <SelectItem value="d">Option D</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  
+                  {currentQuestion.type === 'single_choice' && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {["a", "b", "c", "d"].map((optId) => {
+                            const isSelected = currentQuestion.correctAnswer === optId;
+                            return (
+                                <div 
+                                    key={optId} 
+                                    onClick={() => {
+                                        setCurrentQuestion({
+                                            ...currentQuestion,
+                                            correctAnswer: optId
+                                        });
+                                    }}
+                                    className={`
+                                        cursor-pointer flex items-center justify-center p-3 rounded-lg border-2 transition-all duration-200
+                                        ${isSelected 
+                                            ? 'border-primary bg-primary text-primary-foreground shadow-md' 
+                                            : 'border-muted hover:border-primary/50 hover:bg-muted/50'
+                                        }
+                                    `}
+                                >
+                                    <div className="flex items-center gap-2">
+                                      <div className={`
+                                          w-5 h-5 rounded-full flex items-center justify-center border transition-colors
+                                          ${isSelected ? 'bg-white border-white' : 'border-gray-400'}
+                                      `}>
+                                          {isSelected && <div className="w-2 h-2 rounded-full bg-primary" />}
+                                      </div>
+                                      <span className="font-semibold text-base">Option {optId.toUpperCase()}</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                  )}
+
+                  {currentQuestion.type === 'multi_choice' && (
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {["a", "b", "c", "d"].map((optId) => {
+                              const isSelected = (currentQuestion.correctAnswer as string[]).includes(optId);
+                              return (
+                                  <div 
+                                      key={optId} 
+                                      onClick={() => {
+                                          const currentAns = currentQuestion.correctAnswer as string[];
+                                          let newAns;
+                                          if (!isSelected) {
+                                              newAns = [...currentAns, optId];
+                                          } else {
+                                              newAns = currentAns.filter(id => id !== optId);
+                                          }
+                                          setCurrentQuestion({
+                                              ...currentQuestion,
+                                              correctAnswer: newAns
+                                          });
+                                      }}
+                                      className={`
+                                          cursor-pointer flex items-center justify-center p-3 rounded-lg border-2 transition-all duration-200
+                                          ${isSelected 
+                                              ? 'border-primary bg-primary text-primary-foreground shadow-md' 
+                                              : 'border-muted hover:border-primary/50 hover:bg-muted/50'
+                                          }
+                                      `}
+                                  >
+                                      <div className="flex items-center gap-2">
+                                        <div className={`
+                                            w-5 h-5 rounded flex items-center justify-center border transition-colors
+                                            ${isSelected ? 'bg-white text-primary border-white' : 'border-gray-400'}
+                                        `}>
+                                            {isSelected && <Check className="w-3.5 h-3.5" />}
+                                        </div>
+                                        <span className="font-semibold text-base">Option {optId.toUpperCase()}</span>
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  )}
+
+
+                  {currentQuestion.type === 'integer' && (
+                      <Input 
+                          type="text" 
+                          placeholder="Enter numerical answer (e.g. 5, 2.5, -10)"
+                          value={currentQuestion.numericalAnswer || ''}
+                          onChange={(e) => setCurrentQuestion({
+                              ...currentQuestion,
+                              numericalAnswer: e.target.value
+                          })}
+                      />
+                  )}
                 </div>
+              
+              </>
+              )}
               </div>
 
               <div className="flex justify-end gap-4 mt-6">
@@ -1322,7 +1572,7 @@ function CreateTestContent() {
                     <div key={index} className="p-4 border-b last:border-0">
                       <div className="flex items-center justify-between">
                         <h5 className="font-medium">Question {index + 1}</h5>
-                        <Badge>Option {question.correctAnswer.toUpperCase()} is correct</Badge>
+                        <Badge>Option {Array.isArray(question.correctAnswer) ? (question.correctAnswer as string[]).join(', ').toUpperCase() : (question.correctAnswer as string).toUpperCase()} is correct</Badge>
                       </div>
 
                       {/* Render question text with LaTeX */}
