@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, Suspense, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useUser } from "@clerk/nextjs"
-import { ChevronLeft, Edit, Trash2, Check, Save, Upload, X, Image as ImageIcon, Plus, Eye, EyeOff } from "lucide-react"
+import { ChevronLeft, Edit, Trash2, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -16,8 +16,13 @@ import { toast } from "@/components/ui/use-toast"
 import { BlockMath } from 'react-katex'
 import katex from 'katex'
 import { MarkingSchemeInputs, MarkingScheme } from "@/components/mock-test/MarkingSchemeInputs"
+import { QuestionFormFields } from "@/app/mock-test/components/QuestionFormFields"
+import { CurrentQuestion, DEFAULT_QUESTION } from "@/app/mock-test/types"
+import 'katex/dist/katex.min.css'
 
+// ─────────────────────────────────────────────────────────────────────────────
 // Main page component with Suspense boundary
+// ─────────────────────────────────────────────────────────────────────────────
 export default function CreateTestPage() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><p>Loading...</p></div>}>
@@ -26,18 +31,36 @@ export default function CreateTestPage() {
   )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Saved question type (persisted to questions state after API save)
+// ─────────────────────────────────────────────────────────────────────────────
+interface SavedQuestion {
+  text: string
+  type: 'single_choice' | 'multi_choice' | 'integer'
+  images: string[]
+  options: { id: string; text: string }[]
+  correctAnswer: string | string[]
+  numericalAnswer: string
+  for_class: string[]
+  subjects: string[]
+  topics: string[]
+  tags: string[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Component that uses useSearchParams
+// ─────────────────────────────────────────────────────────────────────────────
 function CreateTestContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const templateParam = searchParams.get('template')
   const { user } = useUser()
 
-  // States for tracking API submission
+  // ── API submission state ────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [testId, setTestId] = useState<string>("")
 
-  // Get template functionality from custom hook
+  // ── Template hook ────────────────────────────────────────────────────────────
   const {
     showSaveTemplateDialog,
     setShowSaveTemplateDialog,
@@ -51,11 +74,11 @@ function CreateTestContent() {
     isSaving
   } = useTestTemplate()
 
-  // States for multi-step form
+  // ── Multi-step form state ────────────────────────────────────────────────────
   const [activeStep, setActiveStep] = useState(1)
   const [addQuestionStep, setAddQuestionStep] = useState<'type-selection' | 'details'>('type-selection')
 
-  // Test details state
+  // ── Test details state ───────────────────────────────────────────────────────
   const [testDetails, setTestDetails] = useState<TestDetails & { subject: string[] }>({
     title: "",
     description: "",
@@ -72,303 +95,185 @@ function CreateTestContent() {
     }
   })
 
-  // Questions state
-  const [questions, setQuestions] = useState<{
-    text: string;
-    type: 'single_choice' | 'multi_choice' | 'integer';
-    images?: string[];
-    options: { id: string; text: string }[];
-    correctAnswer: string | string[]; // string for single/integer, string[] for multi
-    numericalAnswer?: string; // for integer type display/handling
-    for_class?: string[];
-    subjects?: string[];
-    topics?: string[];
-    tags?: string[];
-  }[]>([])
+  // ── Questions list state ─────────────────────────────────────────────────────
+  const [questions, setQuestions] = useState<SavedQuestion[]>([])
 
-  // Current editing question
-  const [currentQuestion, setCurrentQuestion] = useState({
-    text: "",
-    type: 'single_choice' as 'single_choice' | 'multi_choice' | 'integer',
-    options: [
-      { id: "a", text: "" },
-      { id: "b", text: "" },
-      { id: "c", text: "" },
-      { id: "d", text: "" },
-    ],
-    images: [] as string[], // Stores the URLs from backend (for editing/display)
-    newFiles: [] as { file: File, preview: string }[], // Stores new files to upload
-    correctAnswer: "a" as string | string[], // Default for single choice
-    numericalAnswer: "",
-    for_class: ["11"],
-    subjects: ["Physics"],
-    topics: [] as string[],
-    tags: [] as string[],
-    isEditMode: false,
-    editIndex: -1
-  })
+  // ── Current editing question state ───────────────────────────────────────────
+  const [currentQuestion, setCurrentQuestion] = useState<CurrentQuestion>({ ...DEFAULT_QUESTION, newFiles: [] })
 
-  // Load template from URL params if provided
+  // ── Preview / LaTeX ──────────────────────────────────────────────────────────
+  const [showPreview, setShowPreview] = useState(false)
+  const [latexErrors, setLatexErrors] = useState<Record<number, string | null>>({})
+
+  const validateLatex = useCallback((latex: string, index: number) => {
+    try {
+      katex.renderToString(latex)
+      setLatexErrors(prev => ({ ...prev, [index]: null }))
+    } catch {
+      setLatexErrors(prev => ({ ...prev, [index]: 'Invalid LaTeX syntax.' }))
+    }
+  }, [])
+
+  // ── Load template from URL params ────────────────────────────────────────────
   useEffect(() => {
     if (templateParam) {
       loadTemplateFromParams(templateParam, setTestDetails, testDetails)
     }
   }, [templateParam])
 
-  // Submit test details and move to questions step
+  // ── Derived ──────────────────────────────────────────────────────────────────
+  const hasEnoughQuestions = questions.length >= testDetails.questions
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STEP 1: Submit test details
+  // ─────────────────────────────────────────────────────────────────────────────
   const handleSubmitDetails = async () => {
     if (!testDetails.title || !testDetails.description || !testDetails.date || !testDetails.time) {
-      toast({
-        title: "Missing information",
-        description: "Please fill in all required fields",
-        variant: "destructive"
-      })
+      toast({ title: "Missing information", description: "Please fill in all required fields", variant: "destructive" })
       return
     }
 
     setIsSubmitting(true)
-
     try {
-      // Convert date and time to timestamp
-      const dateTimeString = `${testDetails.date}T${testDetails.time}:00`;
-      const timestamp = new Date(dateTimeString).getTime();
+      const dateTimeString = `${testDetails.date}T${testDetails.time}:00`
+      const timestamp = new Date(dateTimeString).getTime()
+      const subjects = Array.isArray(testDetails.subject) ? testDetails.subject : [testDetails.subject]
 
-      // Convert subject to array if it's not already
-      const subjects = Array.isArray(testDetails.subject)
-        ? testDetails.subject
-        : [testDetails.subject];
-
-      // Prepare the request body
-      const requestBody = {
-        title: testDetails.title,
-        description: testDetails.description,
-        test_pattern: "none", // For now, just "none"
-        created_by: user?.primaryEmailAddress?.emailAddress || "test@jeesimplified.com",
-        subjects: subjects, // Array of subjects
-        difficulty: testDetails.difficulty,
-        status: "draft",
-        test_duration: testDetails.duration,
-        test_date: timestamp,
-        max_score: testDetails.questions * 4, // Default score, can be made configurable later
-        are_questions_public: false, // Default value
-        questions: testDetails.questions, // Number of questions
-        marking_scheme: testDetails.marking_scheme,
-      };
-
-      // Send the request to the backend using our new API route
       const response = await fetch('/api/tests', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      });
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: testDetails.title,
+          description: testDetails.description,
+          test_pattern: "none",
+          created_by: user?.primaryEmailAddress?.emailAddress || "test@jeesimplified.com",
+          subjects,
+          difficulty: testDetails.difficulty,
+          status: "draft",
+          test_duration: testDetails.duration,
+          test_date: timestamp,
+          max_score: testDetails.questions * 4,
+          are_questions_public: false,
+          questions: testDetails.questions,
+          marking_scheme: testDetails.marking_scheme,
+        })
+      })
 
-      const data = await response.json();
-
-
+      const data = await response.json()
       if (data.success) {
-        // Store the test ID for future use (like adding questions)
-        setTestId(data.data.documentId || data.data._id || '');
-
-        // Show success message
-        toast({
-          title: "Test created",
-          description: "Test details saved successfully"
-        });
-
-        // Move to the next step
-        setActiveStep(2);
+        setTestId(data.data.documentId || data.data._id || '')
+        toast({ title: "Test created", description: "Test details saved successfully" })
+        setActiveStep(2)
       } else {
-        throw new Error(data.message || 'Failed to create test');
+        throw new Error(data.message || 'Failed to create test')
       }
     } catch (error) {
-      console.error('Error creating test:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create test. Please try again.",
-        variant: "destructive"
-      });
+      console.error('Error creating test:', error)
+      toast({ title: "Error", description: "Failed to create test. Please try again.", variant: "destructive" })
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
   }
 
-  // Handle save template button click
-  const handleSaveTemplate = () => {
-    saveTemplate(testDetails)
-  }
-
-  // Add or update question
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STEP 2: Add / update question
+  // ─────────────────────────────────────────────────────────────────────────────
   const handleAddQuestion = async () => {
-    // Validate question based on type
     if (!currentQuestion.text) {
-      toast({
-        title: "Missing information",
-        description: "Please enter question text",
-        variant: "destructive"
-      });
-      return;
+      toast({ title: "Missing information", description: "Please enter question text", variant: "destructive" })
+      return
     }
-
-    // Validate options for non-integer types
     if (currentQuestion.type !== 'integer' && currentQuestion.options.some(opt => !opt.text)) {
-      toast({
-        title: "Missing information",
-        description: "Please fill in all option fields",
-        variant: "destructive"
-      });
-      return;
+      toast({ title: "Missing information", description: "Please fill in all option fields", variant: "destructive" })
+      return
     }
-
-    // Validate topics (Mandatory)
     if (!currentQuestion.topics || currentQuestion.topics.length === 0) {
-      toast({
-        title: "Missing information",
-        description: "Please add at least one topic",
-        variant: "destructive"
-      });
-      return;
+      toast({ title: "Missing information", description: "Please add at least one topic", variant: "destructive" })
+      return
     }
-
-    // Validate Answer
     if (currentQuestion.type === 'single_choice') {
-      const correctOption = currentQuestion.options.find(opt => opt.id === currentQuestion.correctAnswer);
+      const correctOption = currentQuestion.options.find(opt => opt.id === currentQuestion.correctAnswer)
       if (!correctOption) {
-        toast({
-          title: "Error",
-          description: "Correct option not found",
-          variant: "destructive"
-        });
-        return;
+        toast({ title: "Error", description: "Correct option not found", variant: "destructive" })
+        return
       }
     } else if (currentQuestion.type === 'multi_choice') {
-      if (!Array.isArray(currentQuestion.correctAnswer) || currentQuestion.correctAnswer.length === 0) {
-        toast({
-          title: "Error",
-          description: "Please select at least one correct option",
-          variant: "destructive"
-        });
-        return;
+      if (!Array.isArray(currentQuestion.correctAnswer) || (currentQuestion.correctAnswer as string[]).length === 0) {
+        toast({ title: "Error", description: "Please select at least one correct option", variant: "destructive" })
+        return
       }
     } else if (currentQuestion.type === 'integer') {
       if (!currentQuestion.numericalAnswer) {
-        toast({
-           title: "Error",
-           description: "Please enter the numerical answer",
-           variant: "destructive"
-        });
-        return;
+        toast({ title: "Error", description: "Please enter the numerical answer", variant: "destructive" })
+        return
       }
     }
 
-    // Get subjects as array
-    const subjects = Array.isArray(testDetails.subject)
-      ? testDetails.subject
-      : [testDetails.subject];
+    // Build FormData
+    const formData = new FormData()
+    formData.append('question_text', currentQuestion.text)
+    formData.append('difficulty', testDetails.difficulty || "Medium")
+    formData.append('subjects', JSON.stringify(currentQuestion.subjects))
+    formData.append('for_class', JSON.stringify(currentQuestion.for_class))
+    formData.append('topics', JSON.stringify(currentQuestion.topics))
+    formData.append('tags', JSON.stringify(currentQuestion.tags))
+    formData.append('existing_images', JSON.stringify(currentQuestion.images))
+    formData.append('origin', JSON.stringify({ type: "mock", exam: "none", test_id: testId }))
+    formData.append('status', "active")
+    formData.append('created_by', user?.primaryEmailAddress?.emailAddress || "test@jeesimplified.com")
 
-    // Construct FormData for backend (Multipart)
-    const formData = new FormData();
-    formData.append('question_text', currentQuestion.text);
-    formData.append('difficulty', testDetails.difficulty || "Medium");
-
-    // Complex fields need to be handled carefully. 
-    formData.append('subjects', JSON.stringify(currentQuestion.subjects));
-    formData.append('for_class', JSON.stringify(currentQuestion.for_class));
-    formData.append('topics', JSON.stringify(currentQuestion.topics));
-    formData.append('tags', JSON.stringify(currentQuestion.tags));
-
-    // Pass existing images so backend keeps them
-    formData.append('existing_images', JSON.stringify(currentQuestion.images));
-
-    // Origin
-    formData.append('origin', JSON.stringify({
-      type: "mock",
-      exam: "none",
-      test_id: testId
-    }));
-
-    // Construct Answer Payload based on Type
-    let answerPayload: any = { type: currentQuestion.type };
-
+    // Answer payload
+    let answerPayload: any
     if (currentQuestion.type === 'single_choice') {
-      const correctOptionIndex = currentQuestion.options.findIndex(opt => opt.id === currentQuestion.correctAnswer);
+      const correctOptionIndex = currentQuestion.options.findIndex(opt => opt.id === currentQuestion.correctAnswer)
       answerPayload = {
         type: "single_choice",
         options: currentQuestion.options.map(opt => opt.text),
         correct_answer: correctOptionIndex.toString()
-      };
+      }
     } else if (currentQuestion.type === 'multi_choice') {
       const correctIndices = (currentQuestion.correctAnswer as string[])
         .map(ans => currentQuestion.options.findIndex(opt => opt.id === ans))
         .sort((a, b) => a - b)
-        .map(String);
-      
+        .map(String)
       answerPayload = {
         type: "multi_choice",
         options: currentQuestion.options.map(opt => opt.text),
-        correct_answer: correctIndices // Array of strings e.g. ["0", "2"]
-      };
-    } else if (currentQuestion.type === 'integer') {
+        correct_answer: correctIndices
+      }
+    } else {
       answerPayload = {
         type: "integer",
-        options: [], // No options for integer
+        options: [],
         correct_answer: currentQuestion.numericalAnswer || "0"
-      };
+      }
     }
+    formData.append('answer', JSON.stringify(answerPayload))
 
-    formData.append('answer', JSON.stringify(answerPayload));
-
-    formData.append('status', "active");
-    formData.append('created_by', user?.primaryEmailAddress?.emailAddress || "test@jeesimplified.com");
-
-    // Append New Images
     if (currentQuestion.newFiles.length > 0) {
-      currentQuestion.newFiles.forEach(item => {
-        formData.append('images', item.file);
-      });
+      currentQuestion.newFiles.forEach(item => formData.append('images', item.file))
     }
 
-    // Send POST request to backend using our new API route
-    let savedImages: string[] = [];
+    let savedImages: string[] = []
     try {
-      // Note: Do NOT set Content-Type header when sending FormData, browser sets it with boundary
-      const response = await fetch("/api/questions", {
-        method: "POST",
-        body: formData
-      });
-      const result = await response.json();
+      const response = await fetch("/api/questions", { method: "POST", body: formData })
+      const result = await response.json()
       if (!result.success) {
-        toast({
-          title: "Error",
-          description: "Failed to add question to backend",
-          variant: "destructive"
-        });
-        return;
+        toast({ title: "Error", description: "Failed to add question to backend", variant: "destructive" })
+        return
       }
-
-      // Assuming result.data.images contains the array of all image URLs (existing + new)
-      if (result.data && result.data.images) {
-        savedImages = result.data.images;
-      } else if (result.data && result.data.image) {
-        // Fallback if backend only returns single image logic for now
-        savedImages = [result.data.image];
-      }
+      if (result.data?.images) savedImages = result.data.images
+      else if (result.data?.image) savedImages = [result.data.image]
     } catch (error) {
-      console.error("Error adding question:", error);
-      toast({
-        title: "Error",
-        description: "An error occurred while adding question",
-        variant: "destructive"
-      });
-      return;
+      console.error("Error adding question:", error)
+      toast({ title: "Error", description: "An error occurred while adding question", variant: "destructive" })
+      return
     }
 
-    // Prepare local question data
-    const questionData = {
+    const questionData: SavedQuestion = {
       text: currentQuestion.text,
       type: currentQuestion.type,
-      images: savedImages.length > 0 ? savedImages : currentQuestion.images, // Use backend URLs
+      images: savedImages.length > 0 ? savedImages : currentQuestion.images,
       options: currentQuestion.type === 'integer' ? [] : [...currentQuestion.options],
       correctAnswer: currentQuestion.correctAnswer,
       numericalAnswer: currentQuestion.numericalAnswer,
@@ -376,69 +281,37 @@ function CreateTestContent() {
       subjects: currentQuestion.subjects,
       topics: currentQuestion.topics,
       tags: currentQuestion.tags
-    };
-
-    if (currentQuestion.isEditMode && currentQuestion.editIndex >= 0) {
-      // Update existing question
-      const updatedQuestions = [...questions];
-      updatedQuestions[currentQuestion.editIndex] = questionData;
-      setQuestions(updatedQuestions);
-      toast({
-        title: "Question updated",
-        description: "Question has been updated successfully"
-      });
-    } else {
-      // Add new question
-      setQuestions([...questions, questionData]);
-      toast({
-        title: "Question added",
-        description: "Question has been added successfully"
-      });
     }
 
-    // Reset form
-    resetQuestionForm();
-  };
+    if (currentQuestion.isEditMode && currentQuestion.editIndex >= 0) {
+      const updated = [...questions]
+      updated[currentQuestion.editIndex] = questionData
+      setQuestions(updated)
+      toast({ title: "Question updated", description: "Question has been updated successfully" })
+    } else {
+      setQuestions([...questions, questionData])
+      toast({ title: "Question added", description: "Question has been added successfully" })
+    }
 
-  // Reset question form
-  const resetQuestionForm = () => {
-    setCurrentQuestion({
-      text: "",
-      type: 'single_choice',
-      options: [
-        { id: "a", text: "" },
-        { id: "b", text: "" },
-        { id: "c", text: "" },
-        { id: "d", text: "" },
-      ],
-      correctAnswer: "a",
-      numericalAnswer: "",
-      images: [],
-      newFiles: [],
-      for_class: ["11"],
-      subjects: ["Physics"],
-      topics: [] as string[],
-      tags: [] as string[],
-      isEditMode: false,
-      editIndex: -1
-    })
-    setAddQuestionStep('type-selection');
+    resetQuestionForm()
   }
 
-  // Edit a question
+  const resetQuestionForm = () => {
+    setCurrentQuestion({ ...DEFAULT_QUESTION, newFiles: [] })
+    setAddQuestionStep('type-selection')
+    setShowPreview(false)
+    setLatexErrors({})
+  }
+
   const handleEditQuestion = (index: number) => {
     const question = questions[index]
     setCurrentQuestion({
+      ...DEFAULT_QUESTION,
       ...question,
-      images: question.images || ((question as any).image ? [(question as any).image] : []), // Handle legacy single image
+      images: question.images || ((question as any).image ? [(question as any).image] : []),
       newFiles: [],
       type: question.type || 'single_choice',
-      options: question.options.length > 0 ? question.options : [
-        { id: "a", text: "" },
-        { id: "b", text: "" },
-        { id: "c", text: "" },
-        { id: "d", text: "" },
-      ], // Fallback if no options (e.g. integer type being converted?)
+      options: question.options.length > 0 ? question.options : DEFAULT_QUESTION.options.map(o => ({ ...o })),
       correctAnswer: question.correctAnswer,
       numericalAnswer: question.numericalAnswer || "",
       for_class: question.for_class || ["11"],
@@ -448,127 +321,72 @@ function CreateTestContent() {
       isEditMode: true,
       editIndex: index
     })
-    setAddQuestionStep('details');
+    setAddQuestionStep('details')
   }
 
-  // Delete a question
   const handleDeleteQuestion = (index: number) => {
-    const updatedQuestions = questions.filter((_, i) => i !== index)
-    setQuestions(updatedQuestions)
-
-    toast({
-      title: "Question deleted",
-      description: "Question has been removed"
-    });
+    setQuestions(questions.filter((_, i) => i !== index))
+    toast({ title: "Question deleted", description: "Question has been removed" })
   }
 
-  // Submit the entire test
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STEP 3: Publish test
+  // ─────────────────────────────────────────────────────────────────────────────
   const handleSubmitTest = async () => {
     if (questions.length === 0) {
-      toast({
-        title: "Missing questions",
-        description: "Please add at least one question",
-        variant: "destructive"
-      });
-      return;
+      toast({ title: "Missing questions", description: "Please add at least one question", variant: "destructive" })
+      return
     }
-
     if (!testId) {
-      toast({
-        title: "Error",
-        description: "Test ID is missing. Please try creating the test again.",
-        variant: "destructive"
-      });
-      return;
+      toast({ title: "Error", description: "Test ID is missing. Please try creating the test again.", variant: "destructive" })
+      return
     }
 
-    setIsSubmitting(true);
-
+    setIsSubmitting(true)
     try {
-      // Calculate actual max score based on added questions
       const calculatedMaxScore = questions.reduce((total, q) => {
-        // Safe access to marking scheme for the question type
-        const typeScheme = testDetails.marking_scheme?.[q.type as keyof typeof testDetails.marking_scheme];
-        return total + (typeScheme?.correct || 0);
-      }, 0);
+        const typeScheme = testDetails.marking_scheme?.[q.type as keyof typeof testDetails.marking_scheme]
+        return total + (typeScheme?.correct || 0)
+      }, 0)
 
-      // Update test status and max_score using our new API route
       const updateResponse = await fetch('/api/tests', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          _id: testId,
-          status: 'scheduled',
-          max_score: calculatedMaxScore
-        })
-      });
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ _id: testId, status: 'scheduled', max_score: calculatedMaxScore })
+      })
+      const updateData = await updateResponse.json()
+      if (!updateData.success) throw new Error(updateData.message || 'Failed to update test status')
 
-      const updateData = await updateResponse.json();
-
-      if (!updateData.success) {
-        throw new Error(updateData.message || 'Failed to update test status');
-      }
-
-      // Show success message
-      toast({
-        title: "Success",
-        description: `Test "${testDetails.title}" published successfully with ${questions.length} questions!`
-      });
-
-      // Navigate back to the tests list
-      router.push('/mock-test');
+      toast({ title: "Success", description: `Test "${testDetails.title}" published successfully with ${questions.length} questions!` })
+      router.push('/mock-test')
     } catch (error) {
-      console.error('Error publishing test:', error);
-      toast({
-        title: "Error",
-        description: "Failed to publish test. Please try again.",
-        variant: "destructive"
-      });
+      console.error('Error publishing test:', error)
+      toast({ title: "Error", description: "Failed to publish test. Please try again.", variant: "destructive" })
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
   }
 
-  // Preview the test
-  const handlePreviewTest = () => {
-    if (questions.length === 0) {
-      toast({
-        title: "Missing questions",
-        description: "Please add at least one question to preview",
-        variant: "destructive"
-      });
-      return;
-    }
+  const handleSaveTemplate = () => saveTemplate(testDetails)
 
-    // In a real app, you would save the draft and redirect to a preview page
-    toast({
-      title: "Coming soon",
-      description: "Preview functionality will be implemented soon"
-    });
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Helper: format correct answer label for the questions table
+  // ─────────────────────────────────────────────────────────────────────────────
+  const correctAnswerLabel = (q: SavedQuestion): string => {
+    if (q.type === 'integer') return q.numericalAnswer || '—'
+    if (q.type === 'multi_choice') {
+      const arr = Array.isArray(q.correctAnswer) ? q.correctAnswer : []
+      return arr.map(a => a.toUpperCase()).join(', ') || '—'
+    }
+    return typeof q.correctAnswer === 'string' ? q.correctAnswer.toUpperCase() : '—'
   }
 
-  // Check if we have added enough questions
-  const hasEnoughQuestions = questions.length >= testDetails.questions;
-
-  const [showPreview, setShowPreview] = useState(false);
-  const [latexErrors, setLatexErrors] = useState<Record<number, string | null>>({});
-
-
-  const validateLatex = (latex: string, index: number) => {
-    try {
-      katex.renderToString(latex);
-      setLatexErrors(prev => ({ ...prev, [index]: null }));
-    } catch (err) {
-      setLatexErrors(prev => ({ ...prev, [index]: 'Invalid LaTeX syntax.' + { err } }));
-    }
-  };
-
-
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div className="container py-8">
-      {/* Save Template Dialog - Using the extracted component */}
+      {/* Save Template Dialog */}
       <SaveTemplateDialog
         open={showSaveTemplateDialog}
         onOpenChange={setShowSaveTemplateDialog}
@@ -581,6 +399,7 @@ function CreateTestContent() {
         isSaving={isSaving}
       />
 
+      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={() => router.push('/mock-test')}>
@@ -591,124 +410,59 @@ function CreateTestContent() {
 
         <div className="flex items-center gap-4">
           <div className="flex items-center">
-            <div className={`w-8 h-8 flex items-center justify-center rounded-full border ${activeStep >= 1 ? 'bg-primary text-primary-foreground' : 'border-muted text-muted-foreground'} mr-2`}>
-              1
-            </div>
+            <div className={`w-8 h-8 flex items-center justify-center rounded-full border ${activeStep >= 1 ? 'bg-primary text-primary-foreground' : 'border-muted text-muted-foreground'} mr-2`}>1</div>
             <span className={activeStep >= 1 ? 'font-medium' : 'text-muted-foreground'}>Test Details</span>
           </div>
           <div className="w-8 h-[2px] bg-muted" />
           <div className="flex items-center">
-            <div className={`w-8 h-8 flex items-center justify-center rounded-full border ${activeStep >= 2 ? 'bg-primary text-primary-foreground' : 'border-muted text-muted-foreground'} mr-2`}>
-              2
-            </div>
+            <div className={`w-8 h-8 flex items-center justify-center rounded-full border ${activeStep >= 2 ? 'bg-primary text-primary-foreground' : 'border-muted text-muted-foreground'} mr-2`}>2</div>
             <span className={activeStep >= 2 ? 'font-medium' : 'text-muted-foreground'}>Add Questions</span>
           </div>
           <div className="w-8 h-[2px] bg-muted" />
           <div className="flex items-center">
-            <div className={`w-8 h-8 flex items-center justify-center rounded-full border ${activeStep >= 3 ? 'bg-primary text-primary-foreground' : 'border-muted text-muted-foreground'} mr-2`}>
-              3
-            </div>
-            <span className={activeStep >= 3 ? 'font-medium' : 'text-muted-foreground'}>Review & Publish</span>
+            <div className={`w-8 h-8 flex items-center justify-center rounded-full border ${activeStep >= 3 ? 'bg-primary text-primary-foreground' : 'border-muted text-muted-foreground'} mr-2`}>3</div>
+            <span className={activeStep >= 3 ? 'font-medium' : 'text-muted-foreground'}>Review &amp; Publish</span>
           </div>
         </div>
       </div>
 
-      {/* Step 1: Test Details */}
+      {/* ── STEP 1: Test Details ────────────────────────────────────────────── */}
       {activeStep === 1 && (
         <Card className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">Test Details</h2>
-            {isFromTemplate && (
-              <Badge variant="outline" className="text-xs">
-                Using template
-              </Badge>
-            )}
+            {isFromTemplate && <Badge variant="outline" className="text-xs">Using template</Badge>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="test-title">Test Title</Label>
-                <Input
-                  id="test-title"
-                  placeholder="e.g. JEE Advanced Physics Mock Test"
-                  value={testDetails.title}
-                  onChange={(e) => setTestDetails({ ...testDetails, title: e.target.value })}
-                />
+                <Input id="test-title" placeholder="e.g. JEE Advanced Physics Mock Test"
+                  value={testDetails.title} onChange={e => setTestDetails({ ...testDetails, title: e.target.value })} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="test-description">Description</Label>
-                <Input
-                  id="test-description"
-                  placeholder="Brief description of the test"
-                  value={testDetails.description}
-                  onChange={(e) => setTestDetails({ ...testDetails, description: e.target.value })}
-                />
+                <Input id="test-description" placeholder="Brief description of the test"
+                  value={testDetails.description} onChange={e => setTestDetails({ ...testDetails, description: e.target.value })} />
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="test-subject">Subject(s)</Label>
+                <Label>Subject(s)</Label>
                 <div className="flex flex-wrap gap-2">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="physics-checkbox"
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      checked={testDetails.subject.includes("Physics")}
-                      onChange={(e) => {
-                        const updatedSubjects = e.target.checked
-                          ? Array.isArray(testDetails.subject)
-                            ? [...testDetails.subject, "Physics"]
-                            : ["Physics"]
-                          : Array.isArray(testDetails.subject)
-                            ? testDetails.subject.filter(s => s !== "Physics")
-                            : [];
-                        setTestDetails({ ...testDetails, subject: updatedSubjects });
-                      }}
-                    />
-                    <Label htmlFor="physics-checkbox" className="text-sm font-normal">Physics</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="chemistry-checkbox"
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      checked={testDetails.subject.includes("Chemistry")}
-                      onChange={(e) => {
-                        const updatedSubjects = e.target.checked
-                          ? Array.isArray(testDetails.subject)
-                            ? [...testDetails.subject, "Chemistry"]
-                            : ["Chemistry"]
-                          : Array.isArray(testDetails.subject)
-                            ? testDetails.subject.filter(s => s !== "Chemistry")
-                            : [];
-                        setTestDetails({ ...testDetails, subject: updatedSubjects });
-                      }}
-                    />
-                    <Label htmlFor="chemistry-checkbox" className="text-sm font-normal">Chemistry</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="mathematics-checkbox"
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      checked={testDetails.subject.includes("Mathematics")}
-                      onChange={(e) => {
-                        const updatedSubjects = e.target.checked
-                          ? Array.isArray(testDetails.subject)
-                            ? [...testDetails.subject, "Mathematics"]
-                            : ["Mathematics"]
-                          : Array.isArray(testDetails.subject)
-                            ? testDetails.subject.filter(s => s !== "Mathematics")
-                            : [];
-                        setTestDetails({ ...testDetails, subject: updatedSubjects });
-                      }}
-                    />
-                    <Label htmlFor="mathematics-checkbox" className="text-sm font-normal">Mathematics</Label>
-                  </div>
+                  {['Physics', 'Chemistry', 'Mathematics'].map(subj => (
+                    <div key={subj} className="flex items-center space-x-2">
+                      <input type="checkbox" id={`${subj.toLowerCase()}-checkbox`}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        checked={testDetails.subject.includes(subj)}
+                        onChange={e => {
+                          const updated = e.target.checked
+                            ? [...testDetails.subject, subj]
+                            : testDetails.subject.filter(s => s !== subj)
+                          setTestDetails({ ...testDetails, subject: updated })
+                        }} />
+                      <Label htmlFor={`${subj.toLowerCase()}-checkbox`} className="text-sm font-normal">{subj}</Label>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -716,37 +470,20 @@ function CreateTestContent() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="test-questions">Number of Questions</Label>
-                <Input
-                  id="test-questions"
-                  type="number"
-                  min="1"
-                  className="show-spinners"
+                <Input id="test-questions" type="number" min="1" className="show-spinners"
                   value={testDetails.questions || ''}
-                  onChange={(e) => setTestDetails({ ...testDetails, questions: parseInt(e.target.value) || 0 })}
-                />
+                  onChange={e => setTestDetails({ ...testDetails, questions: parseInt(e.target.value) || 0 })} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="test-duration">Duration (minutes)</Label>
-                <Input
-                  id="test-duration"
-                  type="number"
-                  min="1"
-                  className="show-spinners"
+                <Input id="test-duration" type="number" min="1" className="show-spinners"
                   value={testDetails.duration || ''}
-                  onChange={(e) => setTestDetails({ ...testDetails, duration: parseInt(e.target.value) || 0 })}
-                />
+                  onChange={e => setTestDetails({ ...testDetails, duration: parseInt(e.target.value) || 0 })} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="test-difficulty">Difficulty</Label>
-                <Select
-                  value={testDetails.difficulty}
-                  onValueChange={(value) => setTestDetails({ ...testDetails, difficulty: value })}
-                >
-                  <SelectTrigger id="test-difficulty">
-                    <SelectValue placeholder="Select difficulty" />
-                  </SelectTrigger>
+                <Select value={testDetails.difficulty} onValueChange={v => setTestDetails({ ...testDetails, difficulty: v })}>
+                  <SelectTrigger id="test-difficulty"><SelectValue placeholder="Select difficulty" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Easy">Easy</SelectItem>
                     <SelectItem value="Medium">Medium</SelectItem>
@@ -757,53 +494,30 @@ function CreateTestContent() {
             </div>
           </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             <div className="space-y-2">
               <Label htmlFor="test-date">Test Date</Label>
-              <Input
-                id="test-date"
-                type="date"
-                value={testDetails.date}
-                onChange={(e) => setTestDetails({ ...testDetails, date: e.target.value })}
-              />
+              <Input id="test-date" type="date" value={testDetails.date}
+                onChange={e => setTestDetails({ ...testDetails, date: e.target.value })} />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="test-time">Test Time</Label>
-              <Input
-                id="test-time"
-                type="time"
-                value={testDetails.time}
-                onChange={(e) => setTestDetails({ ...testDetails, time: e.target.value })}
-              />
+              <Input id="test-time" type="time" value={testDetails.time}
+                onChange={e => setTestDetails({ ...testDetails, time: e.target.value })} />
             </div>
           </div>
 
           <div className="mt-6">
             <MarkingSchemeInputs
               value={testDetails.marking_scheme!}
-              onChange={(newScheme) => setTestDetails({ ...testDetails, marking_scheme: newScheme })}
+              onChange={newScheme => setTestDetails({ ...testDetails, marking_scheme: newScheme })}
             />
           </div>
 
           <div className="mt-8 flex justify-between">
-            {/* <Button
-              variant="outline"
-              onClick={() => setShowSaveTemplateDialog(true)}
-              className="flex items-center gap-2"
-            >
-              <Save className="h-4 w-4" /> Save as Template
-            </Button> */}
-
             <div className="flex gap-4">
-              <Button variant="outline" onClick={() => router.push('/mock-test')}>
-                Cancel
-              </Button>
-              <Button
-                className="takeuforward-button"
-                onClick={handleSubmitDetails}
-                disabled={isSubmitting}
-              >
+              <Button variant="outline" onClick={() => router.push('/mock-test')}>Cancel</Button>
+              <Button className="takeuforward-button" onClick={handleSubmitDetails} disabled={isSubmitting}>
                 {isSubmitting ? "Saving..." : "Continue to Add Questions"}
               </Button>
             </div>
@@ -811,10 +525,10 @@ function CreateTestContent() {
         </Card>
       )}
 
-      {/* Step 2: Add Questions */}
+      {/* ── STEP 2: Add Questions ────────────────────────────────────────────── */}
       {activeStep === 2 && (
         <div className="space-y-6">
-          {/* Current Questions List */}
+          {/* Questions list */}
           {questions.length > 0 && (
             <Card className="p-6">
               <h3 className="text-lg font-medium mb-4">Questions Added ({questions.length})</h3>
@@ -824,6 +538,7 @@ function CreateTestContent() {
                     <tr>
                       <th className="px-4 py-3 text-left font-medium">#</th>
                       <th className="px-4 py-3 text-left font-medium">Question</th>
+                      <th className="px-4 py-3 text-left font-medium">Type</th>
                       <th className="px-4 py-3 text-left font-medium">Correct Answer</th>
                       <th className="px-4 py-3 text-left font-medium">Actions</th>
                     </tr>
@@ -836,24 +551,23 @@ function CreateTestContent() {
                           <div className="font-medium">{question.text.length > 80 ? question.text.substring(0, 80) + '...' : question.text}</div>
                           {question.images && question.images.length > 0 && (
                             <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
-                              <span className="inline-block w-2 h-2 rounded-full bg-blue-500"></span> {question.images.length} Image{question.images.length !== 1 ? 's' : ''} attached
+                              <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
+                              {question.images.length} Image{question.images.length !== 1 ? 's' : ''} attached
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-4 w-32">
-                          Option {Array.isArray(question.correctAnswer) ? (question.correctAnswer as string[]).join(', ').toUpperCase() : (question.correctAnswer as string).toUpperCase()}
+                        <td className="px-4 py-4">
+                          <Badge variant="outline" className="text-xs">
+                            {question.type === 'single_choice' ? 'Single' : question.type === 'multi_choice' ? 'Multi' : 'Integer'}
+                          </Badge>
                         </td>
+                        <td className="px-4 py-4 w-32">{correctAnswerLabel(question)}</td>
                         <td className="px-4 py-4 w-32">
                           <div className="flex gap-2">
                             <Button size="sm" variant="outline" className="text-xs" onClick={() => handleEditQuestion(index)}>
                               <Edit className="h-3 w-3 mr-1" /> Edit
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs text-red-500 hover:text-red-600"
-                              onClick={() => handleDeleteQuestion(index)}
-                            >
+                            <Button size="sm" variant="outline" className="text-xs text-red-500 hover:text-red-600" onClick={() => handleDeleteQuestion(index)}>
                               <Trash2 className="h-3 w-3 mr-1" /> Delete
                             </Button>
                           </div>
@@ -868,638 +582,44 @@ function CreateTestContent() {
                 <Button variant="outline" onClick={() => setActiveStep(1)}>
                   <ChevronLeft className="mr-2 h-4 w-4" /> Back to Details
                 </Button>
-
-                <Button
-                  className="takeuforward-button"
-                  onClick={() => setActiveStep(3)}
+                <Button className="takeuforward-button" onClick={() => setActiveStep(3)}
                   disabled={!hasEnoughQuestions}
-                  title={!hasEnoughQuestions ? `Add ${testDetails.questions - questions.length} more questions to continue` : "Continue to review"}
-                >
+                  title={!hasEnoughQuestions ? `Add ${testDetails.questions - questions.length} more questions to continue` : "Continue to review"}>
                   Continue to Review <Check className="ml-2 h-4 w-4" />
                 </Button>
               </div>
             </Card>
           )}
 
-          {/* Add New Question Form - Hide when we have enough questions */}
-          {!hasEnoughQuestions && (
+          {/* Add / Edit question form */}
+          {(!hasEnoughQuestions || currentQuestion.isEditMode) && (
             <Card className="p-6">
-              {/* Display progress message */}
-              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-md">
-                <p className="text-blue-700 dark:text-blue-400 text-sm">
-                  {questions.length === 0
-                    ? `Please add ${testDetails.questions} questions to continue.`
-                    : questions.length === 1
-                      ? `You've added 1 question. ${testDetails.questions - questions.length} more ${testDetails.questions - questions.length === 1 ? 'question is' : 'questions are'} required.`
-                      : `You've added ${questions.length} questions. ${testDetails.questions - questions.length} more ${testDetails.questions - questions.length === 1 ? 'question is' : 'questions are'} required.`
-                  }
-                </p>
-              </div>
-
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-semibold">
-                    {currentQuestion.isEditMode ? "Edit Question" : "Add New Question"}
-                    {!currentQuestion.isEditMode && addQuestionStep === 'details' && (
-                        <span className="ml-2 text-sm font-normal text-muted-foreground">
-                            ({currentQuestion.type === 'single_choice' ? 'Single Correct' : 
-                              currentQuestion.type === 'multi_choice' ? 'Multiple Correct' : 'Integer Type'})
-                        </span>
-                    )}
-                  </h3>
-                  {addQuestionStep === 'details' && !currentQuestion.isEditMode && (
-                      <Button variant="ghost" size="sm" onClick={() => setAddQuestionStep('type-selection')}>
-                          Change Type
-                      </Button>
-                  )}
+              {!currentQuestion.isEditMode && (
+                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-md">
+                  <p className="text-blue-700 dark:text-blue-400 text-sm">
+                    {questions.length === 0
+                      ? `Please add ${testDetails.questions} questions to continue.`
+                      : `You've added ${questions.length} question${questions.length !== 1 ? 's' : ''}. ${testDetails.questions - questions.length} more required.`}
+                  </p>
                 </div>
-
-                {addQuestionStep === 'type-selection' && !currentQuestion.isEditMode ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                        <Card 
-                            className="p-6 cursor-pointer hover:border-blue-600 hover:bg-blue-600 hover:text-white transition-all flex flex-col items-center justify-center text-center gap-3 group"
-                            onClick={() => {
-                                setCurrentQuestion(prev => ({
-                                    ...prev, 
-                                    type: 'single_choice', 
-                                    correctAnswer: 'a'
-                                }));
-                                setAddQuestionStep('details');
-                            }}
-                        >
-                            <div>
-                                <h4 className="font-semibold">Single Correct</h4>
-                                <p className="text-sm text-muted-foreground group-hover:text-blue-100">Traditional multiple choice with one correct answer</p>
-                            </div>
-                        </Card>
-
-                        <Card 
-                            className="p-6 cursor-pointer hover:border-blue-600 hover:bg-blue-600 hover:text-white transition-all flex flex-col items-center justify-center text-center gap-3 group"
-                            onClick={() => {
-                                setCurrentQuestion(prev => ({
-                                    ...prev, 
-                                    type: 'multi_choice', 
-                                    correctAnswer: [] as string[]
-                                }));
-                                setAddQuestionStep('details');
-                            }}
-                        >
-                            <div>
-                                <h4 className="font-semibold">Multiple Correct</h4>
-                                <p className="text-sm text-muted-foreground group-hover:text-blue-100">Multiple choice where more than one option can be correct</p>
-                            </div>
-                        </Card>
-
-                        <Card 
-                            className="p-6 cursor-pointer hover:border-blue-600 hover:bg-blue-600 hover:text-white transition-all flex flex-col items-center justify-center text-center gap-3 group"
-                            onClick={() => {
-                                setCurrentQuestion(prev => ({
-                                    ...prev, 
-                                    type: 'integer',
-                                    correctAnswer: '' // Not really used for integer but keeping consistent type
-                                }));
-                                setAddQuestionStep('details');
-                            }}
-                        >
-                            <div>
-                                <h4 className="font-semibold">Integer Type</h4>
-                                <p className="text-sm text-muted-foreground group-hover:text-blue-100">Questions with a numerical valid answer input</p>
-                            </div>
-                        </Card>
-                    </div>
-                ) : (
-                    <>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Class Selection */}
-                  <div className="space-y-2">
-                    <Label>Class</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {["11", "12", "dropper"].map((cls) => {
-                         const isSelected = currentQuestion.for_class?.includes(cls);
-                         return (
-                        <div 
-                          key={cls} 
-                          onClick={() => {
-                              const updatedClass = isSelected
-                                ? (currentQuestion.for_class || []).filter(c => c !== cls)
-                                : [...(currentQuestion.for_class || []), cls];
-                              setCurrentQuestion({ ...currentQuestion, for_class: updatedClass });
-                          }}
-                          className={`
-                            cursor-pointer px-4 py-2 rounded-full border transition-all text-sm font-medium capitalize
-                            ${isSelected 
-                              ? 'bg-primary/10 border-primary text-primary hover:bg-primary/20' 
-                              : 'bg-background border-muted hover:border-gray-400 text-muted-foreground'
-                            }
-                          `}
-                        >
-                          {cls}
-                        </div>
-                      )})}
-                    </div>
-                  </div>
-
-                  {/* Subject Selection */}
-                  <div className="space-y-2">
-                    <Label>Subject</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {["Physics", "Chemistry", "Mathematics"].map((sub) => {
-                        const isSelected = currentQuestion.subjects?.includes(sub);
-                        return (
-                        <div 
-                          key={sub} 
-                          onClick={() => {
-                              const updatedSubjects = isSelected
-                                ? (currentQuestion.subjects || []).filter(s => s !== sub)
-                                : [...(currentQuestion.subjects || []), sub];
-                              setCurrentQuestion({ ...currentQuestion, subjects: updatedSubjects });
-                          }}
-                          className={`
-                            cursor-pointer px-4 py-2 rounded-full border transition-all text-sm font-medium
-                            ${isSelected 
-                              ? 'bg-primary/10 border-primary text-primary hover:bg-primary/20' 
-                              : 'bg-background border-muted hover:border-gray-400 text-muted-foreground'
-                            }
-                          `}
-                        >
-                          {sub}
-                        </div>
-                      )})}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Topics Input */}
-                  <div className="space-y-2">
-                    <Label htmlFor="question-topics">Topics (Press Enter to add)</Label>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {currentQuestion.topics?.map((topic, i) => (
-                        <Badge key={i} variant="secondary" className="flex items-center gap-1">
-                          {topic}
-                          <button
-                            onClick={() => {
-                              const newTopics = [...currentQuestion.topics];
-                              newTopics.splice(i, 1);
-                              setCurrentQuestion({ ...currentQuestion, topics: newTopics });
-                            }}
-                            className="ml-1 hover:text-destructive"
-                          >
-                            ×
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                    <Input
-                      id="question-topics"
-                      placeholder="Add a topic..."
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          const val = e.currentTarget.value.trim();
-                          if (val && !currentQuestion.topics?.includes(val)) {
-                            setCurrentQuestion({
-                              ...currentQuestion,
-                              topics: [...(currentQuestion.topics || []), val]
-                            });
-                            e.currentTarget.value = '';
-                          }
-                        }
-                      }}
-                    />
-                  </div>
-
-                  {/* Tags Input */}
-                  <div className="space-y-2">
-                    <Label htmlFor="question-tags">Tags (Press Enter to add)</Label>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {currentQuestion.tags?.map((tag, i) => (
-                        <Badge key={i} variant="secondary" className="flex items-center gap-1">
-                          {tag}
-                          <button
-                            onClick={() => {
-                              const newTags = [...currentQuestion.tags];
-                              newTags.splice(i, 1);
-                              setCurrentQuestion({ ...currentQuestion, tags: newTags });
-                            }}
-                            className="ml-1 hover:text-destructive"
-                          >
-                            ×
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                    <Input
-                      id="question-tags"
-                      placeholder="Add a tag..."
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          const val = e.currentTarget.value.trim();
-                          if (val && !currentQuestion.tags?.includes(val)) {
-                            setCurrentQuestion({
-                              ...currentQuestion,
-                              tags: [...(currentQuestion.tags || []), val]
-                            });
-                            e.currentTarget.value = '';
-                          }
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-
-                  <div className="flex items-center gap-2 mb-1">
-                    <Label htmlFor="question-text">Question Text</Label>
-                    <button
-                      type="button"
-                      onClick={() => setShowPreview(!showPreview)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ml-2 ${showPreview
-                        ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-500/20'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                        }`}
-                    >
-                      {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      {showPreview ? 'Hide Preview' : 'Show Preview'}
-                    </button>
-                  </div>
-                  <textarea
-                    id="question-text"
-                    placeholder="Enter the question text"
-                    value={currentQuestion.text}
-                    onChange={(e) => {
-                      const text = e.target.value;
-                      setCurrentQuestion({ ...currentQuestion, text });
-                      validateLatex(text, -1);
-                    }}
-                    className="w-full min-h-[100px] p-3 border border-gray-300 rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    rows={3}
-                  />
-                  {latexErrors && <p className="text-red-600 text-sm">{latexErrors[-1]}</p>}
-                  {showPreview && !latexErrors[-1] && (
-                    <div className="border rounded p-4 bg-gray-50 dark:bg-gray-900/30 mt-2 break-words">
-                      <div className="overflow-x-auto">
-                        <BlockMath math={currentQuestion.text} />
-                      </div>
-
-                      {/* Show images in preview */}
-                      {(currentQuestion.images.length > 0 || currentQuestion.newFiles.length > 0) && (
-                        <div className="mt-4 pt-4 border-t">
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">Attached Images:</p>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            {/* Existing images */}
-                            {currentQuestion.images.map((url, idx) => (
-                              <div key={`preview-existing-${idx}`} className="relative">
-                                <img
-                                  src={url}
-                                  alt={`Attachment ${idx + 1}`}
-                                  className="rounded border border-gray-200 dark:border-gray-700 max-h-40 w-full object-contain bg-white dark:bg-gray-800"
-                                />
-                                <span className="absolute top-1 left-1 bg-gray-800/70 text-white text-[10px] px-1.5 py-0.5 rounded">
-                                  Saved
-                                </span>
-                              </div>
-                            ))}
-
-                            {/* New files preview */}
-                            {currentQuestion.newFiles.map((item, idx) => (
-                              <div key={`preview-new-${idx}`} className="relative">
-                                <img
-                                  src={item.preview}
-                                  alt={`New Attachment ${idx + 1}`}
-                                  className="rounded border border-blue-300 dark:border-blue-700 max-h-40 w-full object-contain bg-white dark:bg-gray-800"
-                                />
-                                <span className="absolute top-1 left-1 bg-blue-600/90 text-white text-[10px] px-1.5 py-0.5 rounded">
-                                  New
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Image Attachments</Label>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${(currentQuestion.images.length + currentQuestion.newFiles.length) >= 3
-                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                      }`}>
-                      {currentQuestion.images.length + currentQuestion.newFiles.length}/3 images
-                    </span>
-                  </div>
-
-                  {/* Custom File Upload Area */}
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="flex items-center justify-center w-full">
-                      <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer bg-blue-50/30 hover:bg-blue-50 dark:bg-blue-900/10 dark:hover:bg-blue-900/20 border-blue-200 dark:border-blue-800 transition-all duration-200 group">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <div className="p-3 bg-blue-100 dark:bg-blue-900/40 rounded-full mb-3 group-hover:scale-110 transition-transform duration-200">
-                            <Upload className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                          </div>
-                          <p className="text-sm text-gray-600 dark:text-gray-300 font-medium"><span className="text-blue-600 dark:text-blue-400 font-semibold">Click to upload</span> or drag and drop</p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">PNG, JPG, GIF, or WEBP (max 3 images per question)</p>
-                        </div>
-                        <input
-                          id="dropzone-file"
-                          type="file"
-                          className="hidden"
-                          multiple
-                          accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files.length > 0) {
-                              const filesArray = Array.from(e.target.files);
-
-                              // Calculate current total images (existing + new)
-                              const currentTotalImages = currentQuestion.images.length + currentQuestion.newFiles.length;
-                              const maxImages = 3;
-                              const remainingSlots = maxImages - currentTotalImages;
-
-                              // Check if already at max
-                              if (remainingSlots <= 0) {
-                                toast({
-                                  title: "Image limit reached",
-                                  description: "You can only upload a maximum of 3 images per question.",
-                                  variant: "destructive"
-                                });
-                                e.target.value = '';
-                                return;
-                              }
-
-                              // Filter and validate files
-                              const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
-                              const validFiles: File[] = [];
-                              const invalidFiles: string[] = [];
-
-                              for (const file of filesArray) {
-                                // Check if file is an image
-                                if (!file.type.startsWith('image/') || !allowedTypes.includes(file.type)) {
-                                  invalidFiles.push(file.name);
-                                } else {
-                                  validFiles.push(file);
-                                }
-                              }
-
-                              // Show warning for invalid files
-                              if (invalidFiles.length > 0) {
-                                toast({
-                                  title: "Invalid file type",
-                                  description: `The following files are not valid images and were skipped: ${invalidFiles.join(', ')}`,
-                                  variant: "destructive"
-                                });
-                              }
-
-                              // Limit to remaining slots
-                              const filesToAdd = validFiles.slice(0, remainingSlots);
-
-                              // Warn if some files were skipped due to limit
-                              if (validFiles.length > remainingSlots) {
-                                toast({
-                                  title: "Some images skipped",
-                                  description: `Only ${remainingSlots} image${remainingSlots > 1 ? 's' : ''} can be added. Maximum of 3 images allowed per question.`,
-                                  variant: "destructive"
-                                });
-                              }
-
-                              if (filesToAdd.length > 0) {
-                                const newFileObjects = filesToAdd.map(file => ({
-                                  file,
-                                  preview: URL.createObjectURL(file)
-                                }));
-
-                                setCurrentQuestion(prev => ({
-                                  ...prev,
-                                  newFiles: [...prev.newFiles, ...newFileObjects]
-                                }));
-                              }
-
-                              // Reset input
-                              e.target.value = '';
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
-
-                    {/* Image Previews Grid */}
-                    {(currentQuestion.images.length > 0 || currentQuestion.newFiles.length > 0) && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
-                        {/* Existing Images (Backend URLs) */}
-                        {currentQuestion.images.map((url, idx) => (
-                          <div key={`existing-${idx}`} className="relative group aspect-video bg-gray-100 rounded-lg overflow-hidden border">
-                            <img src={url} alt={`Attachment ${idx + 1}`} className="w-full h-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setCurrentQuestion(prev => ({
-                                  ...prev,
-                                  images: prev.images.filter((_, i) => i !== idx)
-                                }));
-                              }}
-                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-80 hover:opacity-100 transition-opacity"
-                              title="Remove image"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-2 py-0.5 truncate">
-                              Saved
-                            </div>
-                          </div>
-                        ))}
-
-                        {/* New Files (Local Previews) */}
-                        {currentQuestion.newFiles.map((item, idx) => (
-                          <div key={`new-${idx}`} className="relative group aspect-video bg-gray-100 rounded-lg overflow-hidden border border-blue-200">
-                            <img src={item.preview} alt={`New Attachment ${idx + 1}`} className="w-full h-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                // Revoke URL to avoid memory leaks
-                                URL.revokeObjectURL(item.preview);
-                                setCurrentQuestion(prev => ({
-                                  ...prev,
-                                  newFiles: prev.newFiles.filter((_, i) => i !== idx)
-                                }));
-                              }}
-                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-80 hover:opacity-100 transition-opacity"
-                              title="Remove image"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                            <div className="absolute bottom-0 left-0 right-0 bg-blue-500/50 text-white text-[10px] px-2 py-0.5 truncate">
-                              New
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {currentQuestion.type !== 'integer' && (
-                <div className="space-y-4">
-                  <Label>Answer Options</Label>
-                  {currentQuestion.options.map((option, index) => (
-                    <div key={option.id} className="flex flex-col gap-2">
-                      <div className="flex items-start gap-4">
-                        <div className="w-8 h-8 flex items-center justify-center bg-muted rounded-md font-medium flex-shrink-0 mt-1">
-                          {option.id.toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <textarea
-                            placeholder={`Option ${option.id.toUpperCase()}`}
-                            value={option.text}
-                            onChange={(e) => {
-                              const newText = e.target.value;
-                              const newOptions = [...currentQuestion.options];
-                              newOptions[index].text = newText;
-                              setCurrentQuestion({ ...currentQuestion, options: newOptions });
-                              validateLatex(newText, index);
-                            }}
-                            className="w-full min-h-[60px] p-2 border border-gray-300 rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            rows={2}
-                          />
-                          {latexErrors[index] && (
-                            <p className="text-red-600 text-sm mt-1">{latexErrors[index]}</p>
-                          )}
-                        </div>
-                      </div>
-                      {showPreview && !latexErrors[index] && (
-                        <div className="ml-12">
-                          <div className="border rounded p-3 bg-gray-50 break-words">
-                            <div className="overflow-x-auto">
-                              <BlockMath math={option.text} />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="correct-answer">Correct Answer</Label>
-                  
-                  {currentQuestion.type === 'single_choice' && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {["a", "b", "c", "d"].map((optId) => {
-                            const isSelected = currentQuestion.correctAnswer === optId;
-                            return (
-                                <div 
-                                    key={optId} 
-                                    onClick={() => {
-                                        setCurrentQuestion({
-                                            ...currentQuestion,
-                                            correctAnswer: optId
-                                        });
-                                    }}
-                                    className={`
-                                        cursor-pointer flex items-center justify-center p-3 rounded-lg border-2 transition-all duration-200
-                                        ${isSelected 
-                                            ? 'border-primary bg-primary text-primary-foreground shadow-md' 
-                                            : 'border-muted hover:border-primary/50 hover:bg-muted/50'
-                                        }
-                                    `}
-                                >
-                                    <div className="flex items-center gap-2">
-                                      <div className={`
-                                          w-5 h-5 rounded-full flex items-center justify-center border transition-colors
-                                          ${isSelected ? 'bg-white border-white' : 'border-gray-400'}
-                                      `}>
-                                          {isSelected && <div className="w-2 h-2 rounded-full bg-primary" />}
-                                      </div>
-                                      <span className="font-semibold text-base">Option {optId.toUpperCase()}</span>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                  )}
-
-                  {currentQuestion.type === 'multi_choice' && (
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {["a", "b", "c", "d"].map((optId) => {
-                              const isSelected = (currentQuestion.correctAnswer as string[]).includes(optId);
-                              return (
-                                  <div 
-                                      key={optId} 
-                                      onClick={() => {
-                                          const currentAns = currentQuestion.correctAnswer as string[];
-                                          let newAns;
-                                          if (!isSelected) {
-                                              newAns = [...currentAns, optId];
-                                          } else {
-                                              newAns = currentAns.filter(id => id !== optId);
-                                          }
-                                          setCurrentQuestion({
-                                              ...currentQuestion,
-                                              correctAnswer: newAns
-                                          });
-                                      }}
-                                      className={`
-                                          cursor-pointer flex items-center justify-center p-3 rounded-lg border-2 transition-all duration-200
-                                          ${isSelected 
-                                              ? 'border-primary bg-primary text-primary-foreground shadow-md' 
-                                              : 'border-muted hover:border-primary/50 hover:bg-muted/50'
-                                          }
-                                      `}
-                                  >
-                                      <div className="flex items-center gap-2">
-                                        <div className={`
-                                            w-5 h-5 rounded flex items-center justify-center border transition-colors
-                                            ${isSelected ? 'bg-white text-primary border-white' : 'border-gray-400'}
-                                        `}>
-                                            {isSelected && <Check className="w-3.5 h-3.5" />}
-                                        </div>
-                                        <span className="font-semibold text-base">Option {optId.toUpperCase()}</span>
-                                      </div>
-                                  </div>
-                              );
-                          })}
-                      </div>
-                  )}
-
-
-                  {currentQuestion.type === 'integer' && (
-                      <Input 
-                          type="text" 
-                          placeholder="Enter numerical answer (e.g. 5, 2.5, -10)"
-                          value={currentQuestion.numericalAnswer || ''}
-                          onChange={(e) => setCurrentQuestion({
-                              ...currentQuestion,
-                              numericalAnswer: e.target.value
-                          })}
-                      />
-                  )}
-                </div>
-              
-              </>
               )}
-              </div>
 
-              <div className="flex justify-end gap-4 mt-6">
-                <Button
-                  variant="outline"
-                  onClick={resetQuestionForm}
-                >
-                  {currentQuestion.isEditMode ? "Cancel Edit" : "Clear Form"}
-                </Button>
-                <Button
-                  className="takeuforward-button"
-                  onClick={handleAddQuestion}
-                >
-                  {currentQuestion.isEditMode ? "Update Question" : "Add Question"}
-                </Button>
-              </div>
+              <h3 className="font-semibold mb-4">
+                {currentQuestion.isEditMode ? "Edit Question" : "Add New Question"}
+              </h3>
+
+              <QuestionFormFields
+                currentQuestion={currentQuestion}
+                onChange={setCurrentQuestion}
+                addQuestionStep={addQuestionStep}
+                onStepChange={setAddQuestionStep}
+                showPreview={showPreview}
+                onTogglePreview={() => setShowPreview(p => !p)}
+                latexErrors={latexErrors}
+                onValidateLatex={validateLatex}
+                onSubmit={handleAddQuestion}
+                onCancel={resetQuestionForm}
+              />
 
               {questions.length === 0 && (
                 <div className="mt-8 pt-6 border-t flex justify-between">
@@ -1511,8 +631,8 @@ function CreateTestContent() {
             </Card>
           )}
 
-          {/* Show a message when enough questions have been added */}
-          {hasEnoughQuestions && !questions[0]?.text.includes("editing") && (
+          {/* All questions added banner */}
+          {hasEnoughQuestions && !currentQuestion.isEditMode && (
             <Card className="p-6 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900">
               <div className="flex items-center justify-between">
                 <div>
@@ -1527,7 +647,7 @@ function CreateTestContent() {
         </div>
       )}
 
-      {/* Step 3: Review & Publish */}
+      {/* ── STEP 3: Review & Publish ─────────────────────────────────────────── */}
       {activeStep === 3 && (
         <div className="space-y-6">
           <Card className="p-6">
@@ -1540,28 +660,16 @@ function CreateTestContent() {
                     <h4 className="text-lg font-bold">{testDetails.title}</h4>
                     <p className="text-muted-foreground mt-1">{testDetails.description}</p>
                   </div>
-                  <Badge className={
-                    testDetails.difficulty === "Hard" ? "bg-red-500/90" :
-                      testDetails.difficulty === "Medium" ? "bg-amber-500/90" :
-                        "bg-green-500/90"
-                  }>
+                  <Badge className={testDetails.difficulty === "Hard" ? "bg-red-500/90" : testDetails.difficulty === "Medium" ? "bg-amber-500/90" : "bg-green-500/90"}>
                     {testDetails.difficulty}
                   </Badge>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Subject:</span> {testDetails.subject.join(', ')}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Questions:</span> {testDetails.questions}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Duration:</span> {testDetails.duration} minutes
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Date & Time:</span> {testDetails.date} at {testDetails.time}
-                  </div>
+                  <div><span className="text-muted-foreground">Subject:</span> {testDetails.subject.join(', ')}</div>
+                  <div><span className="text-muted-foreground">Questions:</span> {testDetails.questions}</div>
+                  <div><span className="text-muted-foreground">Duration:</span> {testDetails.duration} minutes</div>
+                  <div><span className="text-muted-foreground">Date &amp; Time:</span> {testDetails.date} at {testDetails.time}</div>
                 </div>
               </div>
 
@@ -1570,18 +678,28 @@ function CreateTestContent() {
                 <div className="max-h-[400px] overflow-y-auto">
                   {questions.map((question, index) => (
                     <div key={index} className="p-4 border-b last:border-0">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <h5 className="font-medium">Question {index + 1}</h5>
-                        <Badge>Option {Array.isArray(question.correctAnswer) ? (question.correctAnswer as string[]).join(', ').toUpperCase() : (question.correctAnswer as string).toUpperCase()} is correct</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {question.type === 'single_choice' ? 'Single' : question.type === 'multi_choice' ? 'Multi' : 'Integer'}
+                          </Badge>
+                          <Badge>
+                            {question.type === 'integer'
+                              ? `Answer: ${question.numericalAnswer}`
+                              : `Option${Array.isArray(question.correctAnswer) ? 's' : ''} ${correctAnswerLabel(question)} is correct`}
+                          </Badge>
+                        </div>
                       </div>
 
-                      {/* Render question text with LaTeX */}
+                      {/* Question text with LaTeX */}
                       <div className="mt-3 p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded border border-blue-100 dark:border-blue-900/30">
                         <div className="overflow-x-auto">
                           <BlockMath math={question.text} />
                         </div>
                       </div>
 
+                      {/* Images */}
                       {question.images && question.images.length > 0 && (
                         <div className="mt-3 mb-2 grid grid-cols-2 md:grid-cols-3 gap-2">
                           {question.images.map((img, i) => (
@@ -1590,29 +708,27 @@ function CreateTestContent() {
                         </div>
                       )}
 
-                      {/* Backward compatibility for single image if needed */}
-                      {!question.images && (question as any).image && (
-                        <div className="mt-3 mb-2 max-w-md">
-                          <img src={(question as any).image} alt="Question attachment" className="rounded border max-h-60 object-contain" />
+                      {/* Options (for non-integer types) */}
+                      {question.type !== 'integer' && (
+                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {question.options.map(option => {
+                            const isCorrect = question.type === 'multi_choice'
+                              ? (Array.isArray(question.correctAnswer) && (question.correctAnswer as string[]).includes(option.id))
+                              : option.id === question.correctAnswer
+                            return (
+                              <div key={option.id}
+                                className={`p-3 rounded border ${isCorrect ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-muted bg-white dark:bg-gray-900/30'}`}>
+                                <div className="flex items-start gap-2">
+                                  <strong className="text-sm font-semibold min-w-[20px]">{option.id.toUpperCase()}:</strong>
+                                  <div className="flex-1 overflow-x-auto">
+                                    <BlockMath math={option.text} />
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
-
-                      {/* Render options with LaTeX */}
-                      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {question.options.map((option) => (
-                          <div
-                            key={option.id}
-                            className={`p-3 rounded border ${option.id === question.correctAnswer ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-muted bg-white dark:bg-gray-900/30'}`}
-                          >
-                            <div className="flex items-start gap-2">
-                              <strong className="text-sm font-semibold min-w-[20px]">{option.id.toUpperCase()}:</strong>
-                              <div className="flex-1 overflow-x-auto">
-                                <BlockMath math={option.text} />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
                     </div>
                   ))}
                 </div>
@@ -1620,24 +736,12 @@ function CreateTestContent() {
             </div>
 
             <div className="mt-8 flex justify-between">
-              <div>
-                <Button variant="outline" onClick={() => setActiveStep(2)}>
-                  <ChevronLeft className="mr-2 h-4 w-4" /> Back to Questions
-                </Button>
-              </div>
-
-              <div className="flex gap-4">
-                <Button variant="outline" onClick={handlePreviewTest}>
-                  Preview Test
-                </Button>
-                <Button
-                  className="takeuforward-button"
-                  onClick={handleSubmitTest}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Publishing..." : "Publish Test"}
-                </Button>
-              </div>
+              <Button variant="outline" onClick={() => setActiveStep(2)}>
+                <ChevronLeft className="mr-2 h-4 w-4" /> Back to Questions
+              </Button>
+              <Button className="takeuforward-button" onClick={handleSubmitTest} disabled={isSubmitting}>
+                {isSubmitting ? "Publishing..." : "Publish Test"}
+              </Button>
             </div>
           </Card>
         </div>
