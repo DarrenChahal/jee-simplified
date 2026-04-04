@@ -316,7 +316,7 @@ export default function EditTestPage() {
     formData.append('existing_images', JSON.stringify(currentQuestion.images))
     formData.append('origin', JSON.stringify({ type: 'mock', exam: 'none', test_id: testId }))
     formData.append('status', 'active')
-    formData.append('created_by', user?.primaryEmailAddress?.emailAddress || 'test@jeesimplified.com')
+    formData.append('created_by', user?.primaryEmailAddress?.emailAddress || 'test@solveiit.com')
 
     // Build answer payload
     let answerPayload: any

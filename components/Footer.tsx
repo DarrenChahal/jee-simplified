@@ -53,7 +53,7 @@ export function Footer() {
                                         For any queries or bug reports, please reach out to us at:
                                     </p>
                                     <p className="text-center font-medium mt-2 text-primary select-all">
-                                        Official@jeesimplifies.com
+                                        Official@solveiit.com
                                     </p>
                                 </div>
                             </DialogContent>

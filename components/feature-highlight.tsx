@@ -9,7 +9,7 @@ export default function FeatureHighlight() {
             <div className="inline-block rounded-lg bg-primary/10 px-3 py-1 text-sm text-primary">
               Platform Features
             </div>
-            <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">Why Choose JEEMaster?</h2>
+            <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">Why Choose solve<span className="text-primary">IIT</span>?</h2>
             <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
               Our platform is designed to help you succeed in JEE with features that make learning effective and
               engaging.

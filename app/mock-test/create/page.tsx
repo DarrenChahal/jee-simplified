@@ -146,7 +146,7 @@ function CreateTestContent() {
           title: testDetails.title,
           description: testDetails.description,
           test_pattern: "none",
-          created_by: user?.primaryEmailAddress?.emailAddress || "test@jeesimplified.com",
+          created_by: user?.primaryEmailAddress?.emailAddress || "test@solveiit.com",
           subjects,
           difficulty: testDetails.difficulty,
           status: "draft",
@@ -220,7 +220,7 @@ function CreateTestContent() {
     formData.append('existing_images', JSON.stringify(currentQuestion.images))
     formData.append('origin', JSON.stringify({ type: "mock", exam: "none", test_id: testId }))
     formData.append('status', "active")
-    formData.append('created_by', user?.primaryEmailAddress?.emailAddress || "test@jeesimplified.com")
+    formData.append('created_by', user?.primaryEmailAddress?.emailAddress || "test@solveiit.com")
 
     // Answer payload
     let answerPayload: any
