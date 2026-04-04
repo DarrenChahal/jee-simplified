@@ -245,7 +245,7 @@ const RecentActivity = ({ activities = [], email }: RecentActivityProps) => {
     );
   }
 
-  const userEmail = email || 'test@jeesimplified.com';
+  const userEmail = email || 'test@solveiit.com';
 
   return (
     <Card className="hover:shadow-hover transition-all duration-300">

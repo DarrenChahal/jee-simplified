@@ -36,7 +36,7 @@ export default async function TestAnalysisPage({ params, searchParams }: PagePro
     const { email } = await searchParams; // User email passed via query param or simple auth context if available
 
     // Fallback if no email provided in query (just a basic check, in real app assumes auth)
-    const userEmail = email || "test@jeesimplified.com";
+    const userEmail = email || "test@solveiit.com";
 
     const data = await getTestAnalytics(id, userEmail);
     console.log("Test Analytics Data:", data);

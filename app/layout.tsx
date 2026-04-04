@@ -26,10 +26,10 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <head>
-          <title>JEE Simplified - Practice Platform</title>
+          <title>solveIIT - JEE Practice Platform</title>
           <meta
             name="description"
-            content="A platform for JEE aspirants to practice problems and mock tests"
+            content="A platform for JEE aspirants to practice problems and mock tests - solveIIT"
           />
         </head>
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
